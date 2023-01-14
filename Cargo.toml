@@ -1,0 +1,7 @@
+[workspace]
+
+members = [
+    "dev",
+    "rocust",
+    "rocust_macros"
+]
