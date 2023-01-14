@@ -3,5 +3,6 @@
 members = [
     "dev",
     "rocust",
+    "rocust_lib",
     "rocust_macros"
 ]

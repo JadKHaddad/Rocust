@@ -11,7 +11,7 @@ pub fn add_field(_args: TokenStream, input: TokenStream) -> TokenStream  {
                 syn::Fields::Named(fields) => {
                     fields
                         .named
-                        .push(syn::Field::parse_named.parse2(quote! { pub a: String }).unwrap());
+                        .push(syn::Field::parse_named.parse2(quote! { pub results: rocust_lib::results::Results }).unwrap());
                 }   
                 _ => {
                     ()

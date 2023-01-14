@@ -5,6 +5,9 @@ version = 3
 [[package]]
 name = "dev"
 version = "0.1.0"
+dependencies = [
+ "rocust",
+]
 
 [[package]]
 name = "proc-macro2"
@@ -28,8 +31,13 @@ dependencies = [
 name = "rocust"
 version = "0.1.0"
 dependencies = [
+ "rocust_lib",
  "rocust_macros",
 ]
+
+[[package]]
+name = "rocust_lib"
+version = "0.1.0"
 
 [[package]]
 name = "rocust_macros"
@@ -37,6 +45,7 @@ version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
+ "rocust_lib",
  "syn",
 ]
 
