@@ -25,3 +25,22 @@ pub fn add_field(_args: TokenStream, input: TokenStream) -> TokenStream  {
         _ => panic!("`add_field` has to be used with structs "),
     }
 }
+
+#[proc_macro_derive(User)]
+pub fn derive(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as DeriveInput);
+    let name = &ast.ident;
+
+    let expanded = quote! {
+        impl rocust_lib::traits::User for #name {
+            fn add_succ(&mut self, dummy: i32) {
+                self.results.add_succ(dummy);
+            }
+            fn add_fail(&mut self, dummy: i32) {
+                self.results.add_fail(dummy);
+            }
+        }
+    };
+
+    expanded.into()
+}
