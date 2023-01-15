@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use proc_macro::TokenStream;
 use proc_macro2::TokenTree;
 use quote::quote;
@@ -33,9 +35,11 @@ pub fn be_user(_args: TokenStream, input: TokenStream) -> TokenStream {
     }
 }
 
+
 #[proc_macro_attribute]
 pub fn task(attr: TokenStream, item: TokenStream) -> TokenStream {
     let impl_block = syn::parse_macro_input!(item as syn::ItemImpl);
+    let return_impl_block = impl_block.clone();
     let struct_name = if let syn::Type::Path(type_path) = &impl_block.self_ty.as_ref() {
         if let Some(ident) = type_path.path.get_ident() {
             ident
@@ -93,7 +97,7 @@ pub fn task(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     }
     
-    println!("{:#?}", methods);
+    //println!("{:#?}", methods);
     let methods = methods.iter().map(|(method_name, priority)| {
         quote! {
             self.tasks.push(rocust_lib::tasks::Task::new(#priority, #struct_name::#method_name));
@@ -103,10 +107,20 @@ pub fn task(attr: TokenStream, item: TokenStream) -> TokenStream {
     //now we can implement the function in the User trait that will inject the tasks in the user struct
 
     let expanded = quote! {
+        #return_impl_block
+
         impl rocust_lib::traits::User for #struct_name {
             fn inject_tasks(&mut self) {
                 #(#methods)*
             }
+
+            fn add_succ(&mut self, dummy: i32) {
+                self.results.add_succ(dummy);
+            }
+            fn add_fail(&mut self, dummy: i32) {
+                self.results.add_fail(dummy);
+            }
+
         }
     };
 

@@ -1,9 +1,10 @@
+#[macro_use] 
 use rocust::rocust_lib;
 use rocust::rocust_macros;
 
 
 #[rocust_macros::be_user]
-#[derive(rocust_macros::User, Default, Clone)]
+#[derive(Default, Clone)]
 pub struct MyUser {
     a: i32,
     b: i32,
@@ -17,13 +18,13 @@ pub struct MyUser {
 impl MyUser {
     //#[rocust_macros::task(priority = 1)]
 
-    #[task(priority = 1)]
+    //#[task(priority = 1)]
     pub fn foo(&mut self) {
         self.a += 1;
         println!("{}", self.a);
     }
 
-    #[task(priority = 3)]
+    //#[task(priority = 3)] //cant find attribute `task` in this scope
     pub fn bar(&mut self) {
         self.b += 1;
         println!("{}", self.b);
