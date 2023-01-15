@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct Results {
     pub succ : i32,
     pub fail : i32,
