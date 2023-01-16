@@ -6,9 +6,9 @@ use quote::quote;
 use syn::{parse::Parser, parse_macro_input, spanned::Spanned, DeriveInput};
 
 #[proc_macro_attribute]
-pub fn be_user(_args: TokenStream, input: TokenStream) -> TokenStream {
-    let mut ast = parse_macro_input!(input as DeriveInput);
-    match &mut ast.data {
+pub fn user(_attrs: TokenStream, item: TokenStream) -> TokenStream {
+    let mut derive_block = parse_macro_input!(item as DeriveInput);
+    match &mut derive_block.data {
         syn::Data::Struct(ref mut struct_data) => {
             match &mut struct_data.fields {
                 syn::Fields::Named(fields) => {
@@ -27,19 +27,17 @@ pub fn be_user(_args: TokenStream, input: TokenStream) -> TokenStream {
             }
 
             return quote! {
-                #ast
+                #derive_block
             }
             .into();
         }
-        _ => panic!("`add_field` has to be used with structs "),
+        _ => panic!("`user` has to be used with structs "),
     }
 }
 
-
 #[proc_macro_attribute]
-pub fn task(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let impl_block = syn::parse_macro_input!(item as syn::ItemImpl);
-    let return_impl_block = impl_block.clone();
+pub fn has_task(_attrs: TokenStream, item: TokenStream) -> TokenStream {
+    let mut impl_block = syn::parse_macro_input!(item as syn::ItemImpl);
     let struct_name = if let syn::Type::Path(type_path) = &impl_block.self_ty.as_ref() {
         if let Some(ident) = type_path.path.get_ident() {
             ident
@@ -50,20 +48,20 @@ pub fn task(attr: TokenStream, item: TokenStream) -> TokenStream {
         panic!("Could not get type path from self type");
     };
 
-    //collect all the methods names if they have a "proiority" attribute and the value is a number (i32)
     let mut methods = Vec::new();
-    for item in impl_block.items {
+
+    //collect all the methods names if they have a "proiority" attribute and the value is a number (i32) and delete the attribute
+    for item in impl_block.items.iter_mut() {
         if let syn::ImplItem::Method(method) = item {
-            //methods that have the and attribute and this attribute is #[task]
-            let methods_with_task_attr = method
+            let task_attrs = method
                 .attrs
                 .iter()
                 .filter(|attr| attr.path.segments[0].ident == "task");
-            for attr in methods_with_task_attr {
+
+            for attr in task_attrs {
                 let mut token_stream = attr.tokens.clone().into_iter();
                 if let TokenTree::Group(group) = token_stream.next().unwrap() {
                     let tokens = group.stream();
-                    //println!("{:#?}", tokens);
                     let mut iter = tokens.into_iter();
 
                     if let TokenTree::Ident(ident) = iter.next().unwrap() {
@@ -94,10 +92,17 @@ pub fn task(attr: TokenStream, item: TokenStream) -> TokenStream {
                     };
                 }
             }
+
+            //remove the attribute
+            method.attrs.retain(|attr| {
+                if attr.path.is_ident("task") {
+                    return false;
+                }
+                true
+            });
         }
     }
-    
-    //println!("{:#?}", methods);
+
     let methods = methods.iter().map(|(method_name, priority)| {
         quote! {
             self.tasks.push(rocust_lib::tasks::Task::new(#priority, #struct_name::#method_name));
@@ -107,9 +112,9 @@ pub fn task(attr: TokenStream, item: TokenStream) -> TokenStream {
     //now we can implement the function in the User trait that will inject the tasks in the user struct
 
     let expanded = quote! {
-        #return_impl_block
+        #impl_block
 
-        impl rocust_lib::traits::User for #struct_name {
+        impl rocust_lib::traits::HasTask for #struct_name {
             fn inject_tasks(&mut self) {
                 #(#methods)*
             }
@@ -117,6 +122,7 @@ pub fn task(attr: TokenStream, item: TokenStream) -> TokenStream {
             fn add_succ(&mut self, dummy: i32) {
                 self.results.add_succ(dummy);
             }
+
             fn add_fail(&mut self, dummy: i32) {
                 self.results.add_fail(dummy);
             }
@@ -177,28 +183,28 @@ pub fn task(attr: TokenStream, item: TokenStream) -> TokenStream {
 //     expanded.into()
 // }
 
-#[proc_macro_derive(User)]
-pub fn derive(input: TokenStream) -> TokenStream {
-    let ast = parse_macro_input!(input as DeriveInput);
-    let name = &ast.ident;
+// #[proc_macro_derive(User)]
+// pub fn derive(input: TokenStream) -> TokenStream {
+//     let ast = parse_macro_input!(input as DeriveInput);
+//     let name = &ast.ident;
 
-    let expanded = quote! {
-        impl #name {
-            fn with_tasks(mut self, tasks: Vec<rocust_lib::tasks::Task<Self>>) -> Self {
-                self.tasks = tasks;
-                self
-            }
-        }
+//     let expanded = quote! {
+//         impl #name {
+//             fn with_tasks(mut self, tasks: Vec<rocust_lib::tasks::Task<Self>>) -> Self {
+//                 self.tasks = tasks;
+//                 self
+//             }
+//         }
 
-        impl rocust_lib::traits::User for #name {
-            fn add_succ(&mut self, dummy: i32) {
-                self.results.add_succ(dummy);
-            }
-            fn add_fail(&mut self, dummy: i32) {
-                self.results.add_fail(dummy);
-            }
-        }
-    };
+//         impl rocust_lib::traits::User for #name {
+//             fn add_succ(&mut self, dummy: i32) {
+//                 self.results.add_succ(dummy);
+//             }
+//             fn add_fail(&mut self, dummy: i32) {
+//                 self.results.add_fail(dummy);
+//             }
+//         }
+//     };
 
-    expanded.into()
-}
+//     expanded.into()
+// }
