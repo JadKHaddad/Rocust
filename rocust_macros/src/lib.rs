@@ -1,9 +1,7 @@
-use std::sync::Arc;
-
 use proc_macro::TokenStream;
 use proc_macro2::TokenTree;
 use quote::quote;
-use syn::{parse::Parser, parse_macro_input, spanned::Spanned, DeriveInput};
+use syn::{parse::Parser, parse_macro_input, DeriveInput};
 
 #[proc_macro_attribute]
 pub fn user(_attrs: TokenStream, item: TokenStream) -> TokenStream {
