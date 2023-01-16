@@ -14,11 +14,11 @@ impl Default for Results {
 }
 
 impl Results {
-    pub fn add_succ(&mut self, dummy: i32) {
+    pub fn add_succ(&mut self, _dummy: i32) {
         self.succ += 1;
     }
 
-    pub fn add_fail(&mut self, dummy: i32) {
+    pub fn add_fail(&mut self, _dummy: i32) {
         self.fail += 1;
     }
 }
