@@ -15,13 +15,13 @@ impl MyUser {
     #[task(priority = 1)]
     pub fn foo(&mut self) {
         self.a += 1;
-        println!("{}", self.a);
+        println!("foo: {}", self.a);
     }
 
     #[task(priority = 3)]
     pub fn bar(&mut self) {
         self.b += 1;
-        println!("{}", self.b);
+        println!("bar: {}", self.b);
     }
 
     pub fn print(&self) {
@@ -31,18 +31,15 @@ impl MyUser {
 
 impl rocust_lib::traits::User for MyUser {
     fn on_start(&mut self) {
-        println!("on_start");
+        println!("Well I am running!");
     }
 
     fn on_stop(&mut self) {
         println!("on_stop");
     }
 }
-fn main() {
-    //let mut my_user = MyUser::default().with_tasks(vec![rocust_lib::tasks::Task::new(1, MyUser::foo)]);
-    //let task = my_user.tasks[0].clone();
-    //task.call(&mut my_user);
-    //my_user.print();
-
-    //my_struct.tasks.push(Task { priority: 1, func: MyStruct::foo });
+#[tokio::main]
+async fn main() {
+    let test = rocust_lib::test::Test { count: 3 };
+    test.run::<MyUser>().await;
 }

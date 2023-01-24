@@ -125,6 +125,10 @@ pub fn has_task(_attrs: TokenStream, item: TokenStream) -> TokenStream {
                 self.results.add_fail(dummy);
             }
 
+            fn get_tasks(&self) -> Vec<rocust_lib::tasks::Task<Self>> where Self: Sized {
+                self.tasks.clone()
+            }
+
         }
     };
 

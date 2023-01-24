@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 rocust = {path = "../rocust"}
+tokio = {version="1.24.2", features=["full"]}

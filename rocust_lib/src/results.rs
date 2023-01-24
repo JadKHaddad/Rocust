@@ -1,15 +1,12 @@
 #[derive(Clone)]
 pub struct Results {
-    pub succ : i32,
-    pub fail : i32,
+    pub succ: i32,
+    pub fail: i32,
 }
 
 impl Default for Results {
     fn default() -> Self {
-        Results {
-            succ: 0,
-            fail: 0,
-        }
+        Results { succ: 0, fail: 0 }
     }
 }
 
