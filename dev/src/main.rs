@@ -40,6 +40,13 @@ impl rocust_lib::traits::User for MyUser {
 }
 #[tokio::main]
 async fn main() {
-    let test = rocust_lib::test::Test { count: 3 };
+    let test = rocust_lib::test::Test::new(3);
+    let notify = test.notify.clone();
+
+    tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        notify.notify_waiters();
+    });
+
     test.run::<MyUser>().await;
 }
