@@ -48,5 +48,5 @@ async fn main() {
         notify.notify_waiters();
     });
 
-    test.run::<MyUser>().await;
+    test.run_users::<MyUser>().await;
 }
