@@ -103,7 +103,14 @@ pub fn has_task(_attrs: TokenStream, item: TokenStream) -> TokenStream {
 
     let methods = methods.iter().map(|(method_name, priority)| {
         quote! {
-            self.tasks.push(rocust_lib::tasks::Task::new(#priority, #struct_name::#method_name));
+            fn #method_name(u: &mut #struct_name) -> std::pin::Pin<std::sync::Arc<std::boxed::Box<dyn std::future::Future<Output = ()> + '_>>> {
+                let future: std::boxed::Box<dyn std::future::Future<Output = () >> = std::boxed::Box::new(async {
+                    (#struct_name::#method_name)(u).await;
+                });
+                let future = std::pin::Pin::new(std::sync::Arc::new(future));
+                future
+            }
+            self.tasks.push(rocust_lib::tasks::Task::new(#priority, #method_name));
         }
     });
 
@@ -114,7 +121,6 @@ pub fn has_task(_attrs: TokenStream, item: TokenStream) -> TokenStream {
 
         impl rocust_lib::traits::HasTask for #struct_name {
             fn inject_tasks(&mut self) {
-                //TODO
                 //#(#methods)*
             }
 

@@ -18,6 +18,8 @@ impl<T> Task<T> {
     }
 
     pub async fn call(&self, user: &mut T) {
-        (self.func)(user);
+        let s = (self.func)(user);
+        //TODO
+        //s.await;
     }
 }

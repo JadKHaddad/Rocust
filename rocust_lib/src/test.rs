@@ -64,7 +64,10 @@ impl Test {
                     let task = tasks.get(0).unwrap();
 
                     let task_call_and_sleep = async {
+                        println!("calling task");
+                        
                         task.call(&mut user).await; // should be async
+                        println!("sleeping");
                         tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
                     };
 
