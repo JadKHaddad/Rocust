@@ -1,3 +1,7 @@
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+
 use rocust::rocust_lib;
 use rocust::rocust_macros;
 
@@ -27,6 +31,19 @@ impl MyUser {
     pub fn print(&self) {
         println!("a: {}, b: {}", self.a, self.b);
     }
+
+    //task will be like this
+    pub fn my_future(&mut self) -> Pin<Arc<Box<dyn Future<Output = ()>>>> {
+        let future: Box<dyn Future<Output = ()>> = Box::new(async {
+            //function body
+            //make sure it is async in the definition so he would await normally like this
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            println!("Hello, World!");
+        });
+        let future = Arc::new(future);
+        let future = Pin::new(future);
+        future
+    }
 }
 
 impl rocust_lib::traits::User for MyUser {
@@ -40,6 +57,10 @@ impl rocust_lib::traits::User for MyUser {
 }
 #[tokio::main]
 async fn main() {
+    let mut user = MyUser::default();
+    let f = MyUser::my_future;
+    user.tasks.push(rocust_lib::tasks::Task::new(1, f));
+
     let test = rocust_lib::test::Test::new(3);
     let notify = test.notify.clone();
 
@@ -48,5 +69,6 @@ async fn main() {
         notify.notify_waiters();
     });
 
+    //will panice because user has not tasks
     test.run::<MyUser>().await;
 }
