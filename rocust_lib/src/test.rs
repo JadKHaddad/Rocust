@@ -45,12 +45,13 @@ impl Test {
     //     // we still need to run the on_stop
     // }
 
-    pub async fn run_users<T>(&self)
+    pub async fn run<T>(&self)
     where
-        T: HasTask + User + Default + Send + 'static,
+        T: HasTask + User + Default + Send,
     {
         let mut handles = vec![];
         for _ in 0..self.count {
+            //control the spawn rate
             let notify = self.notify.clone();
             let handle = tokio::spawn(async move {
                 let mut user = T::default();
@@ -60,26 +61,49 @@ impl Test {
                 loop {
                     // get a random task
                     // call it
-                    let task = tasks.get(0).unwrap(); 
-                    task.call(&mut user); // should be async so we can also select
+                    let task = tasks.get(0).unwrap();
+
+                    let task_call_and_sleep = async {
+                        task.call(&mut user).await; // should be async
+                        tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+                    };
+
                     // do some sleep or stop
                     tokio::select! {
                         _ = notify.notified() => {
                             break;
                         }
-                        _ = tokio::time::sleep(std::time::Duration::from_millis(1000)) => {
+                        _ = task_call_and_sleep => {
                         }
                     }
                 }
-                
-                user
+                user.on_stop();
             });
             handles.push(handle);
         }
+        //start a timer in another task
+        let notify = self.notify.clone();
+        let timer = tokio::spawn(async move {
+            // this is the run time
+            tokio::select! {
+                // this is the ctrl+c
+                _ = notify.notified() => {
+                    println!("received signal");
+                }
+                // this is the run time
+                _ = tokio::time::sleep(std::time::Duration::from_secs(10)) => {
+                    println!("timer finished");
+                    notify.notify_waiters();
+                }
+            }
+        });
+
         for handle in handles {
-            let mut user = handle.await.unwrap();
-            user.on_stop();
+            handle.await.unwrap();
         }
-        // run time is not defined yet
+        println!("all users finished");
+
+        timer.await.unwrap();
+        println!("terminating");
     }
 }

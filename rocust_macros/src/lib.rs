@@ -114,7 +114,8 @@ pub fn has_task(_attrs: TokenStream, item: TokenStream) -> TokenStream {
 
         impl rocust_lib::traits::HasTask for #struct_name {
             fn inject_tasks(&mut self) {
-                #(#methods)*
+                //TODO
+                //#(#methods)*
             }
 
             fn add_succ(&mut self, dummy: i32) {

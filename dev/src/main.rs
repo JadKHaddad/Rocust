@@ -13,13 +13,13 @@ pub struct MyUser {
 #[rocust_macros::has_task]
 impl MyUser {
     #[task(priority = 1)]
-    pub fn foo(&mut self) {
+    pub async fn foo(&mut self) {
         self.a += 1;
         println!("foo: {}", self.a);
     }
 
     #[task(priority = 3)]
-    pub fn bar(&mut self) {
+    pub async fn bar(&mut self) {
         self.b += 1;
         println!("bar: {}", self.b);
     }
@@ -31,7 +31,7 @@ impl MyUser {
 
 impl rocust_lib::traits::User for MyUser {
     fn on_start(&mut self) {
-        println!("Well I am running!");
+        println!("on_start");
     }
 
     fn on_stop(&mut self) {
@@ -48,5 +48,5 @@ async fn main() {
         notify.notify_waiters();
     });
 
-    test.run_users::<MyUser>().await;
+    test.run::<MyUser>().await;
 }

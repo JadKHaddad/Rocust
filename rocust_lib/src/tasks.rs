@@ -1,11 +1,15 @@
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+
 #[derive(Clone)]
 pub struct Task<T> {
     priority: i32,
-    func: fn(&mut T) -> (),
+    func: fn(&mut T) -> Pin<Arc<dyn Future<Output=()>>>,
 }
 
 impl<T> Task<T> {
-    pub fn new(priority: i32, func: fn(&mut T) -> ()) -> Self {
+    pub fn new(priority: i32, func: fn(&mut T) -> Pin<Arc<dyn Future<Output=()>>>) -> Self {
         Task { priority, func }
     }
 
@@ -13,7 +17,7 @@ impl<T> Task<T> {
         self.priority
     }
 
-    pub fn call(&self, user: &mut T) {
+    pub async fn call(&self, user: &mut T) {
         (self.func)(user);
     }
 }
