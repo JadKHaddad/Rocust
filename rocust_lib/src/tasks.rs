@@ -1,15 +1,17 @@
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct Task<T> {
     priority: i32,
-    func: fn(&mut T) -> Pin<Arc<Box<dyn Future<Output = ()> + '_>>>,
+    func: fn(&mut T) -> Pin<Box<dyn Future<Output = ()> + Send + '_>>,
 }
 
 impl<T> Task<T> {
-    pub fn new(priority: i32, func: fn(&mut T) -> Pin<Arc<Box<dyn Future<Output = ()> + '_>>>) -> Self {
+    pub fn new(
+        priority: i32,
+        func: fn(&mut T) -> Pin<Box<dyn Future<Output = ()> + Send + '_>>,
+    ) -> Self {
         Task { priority, func }
     }
 
@@ -18,8 +20,6 @@ impl<T> Task<T> {
     }
 
     pub async fn call(&self, user: &mut T) {
-        let s = (self.func)(user);
-        //TODO
-        //s.await;
+        (self.func)(user).await;
     }
 }
