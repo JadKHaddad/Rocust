@@ -33,12 +33,13 @@ impl MyUser {
     }
 
     //task will be like this
-    pub fn my_future(&mut self) -> Pin<Arc<Box<dyn Future<Output = ()>>>> {
-        let future: Box<dyn Future<Output = ()>> = Box::new(async {
+    pub fn my_future(&mut self) -> Pin<Arc<Box<dyn Future<Output = ()> + '_>>> {
+        let future: Box<dyn Future<Output = () >> = Box::new(async {
             //function body
             //make sure it is async in the definition so he would await normally like this
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             println!("Hello, World!");
+            self.a += 1;
         });
         let future = Arc::new(future);
         let future = Pin::new(future);

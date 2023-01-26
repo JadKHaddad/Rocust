@@ -5,11 +5,11 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct Task<T> {
     priority: i32,
-    func: fn(&mut T) -> Pin<Arc<Box<dyn Future<Output = ()>>>>,
+    func: fn(&mut T) -> Pin<Arc<Box<dyn Future<Output = ()> + '_>>>,
 }
 
 impl<T> Task<T> {
-    pub fn new(priority: i32, func: fn(&mut T) -> Pin<Arc<Box<dyn Future<Output = ()>>>>) -> Self {
+    pub fn new(priority: i32, func: fn(&mut T) -> Pin<Arc<Box<dyn Future<Output = ()> + '_>>>) -> Self {
         Task { priority, func }
     }
 
