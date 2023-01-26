@@ -20,6 +20,13 @@ pub fn user(_attrs: TokenStream, item: TokenStream) -> TokenStream {
                             .parse2(quote! { pub tasks: Vec<rocust_lib::tasks::Task<Self>> })
                             .unwrap(),
                     );
+                    fields.named.push(
+                        syn::Field::parse_named
+                            .parse2(
+                                quote! { pub async_tasks: Vec<rocust_lib::tasks::AsyncTask<Self>> },
+                            )
+                            .unwrap(),
+                    );
                 }
                 _ => (),
             }
@@ -81,7 +88,11 @@ pub fn has_task(_attrs: TokenStream, item: TokenStream) -> TokenStream {
                     if let TokenTree::Literal(lit) = iter.next().unwrap() {
                         if let Ok(priority) = lit.to_string().parse::<i32>() {
                             let priority = syn::LitInt::new(&priority.to_string(), lit.span());
-                            methods.push((method.sig.ident.clone(), priority));
+                            methods.push((
+                                method.sig.ident.clone(),
+                                priority,
+                                method.sig.asyncness.is_some(),
+                            ));
                         } else {
                             panic!("Only i32 is supported");
                         }
@@ -101,19 +112,29 @@ pub fn has_task(_attrs: TokenStream, item: TokenStream) -> TokenStream {
         }
     }
 
-    let methods = methods.iter().map(|(method_name, priority)| {
-        quote! {
-            fn #method_name(u: &mut #struct_name) -> ::core::pin::Pin<Box<dyn ::core::future::Future<Output = ()> + ::core::marker::Send + '_>> {
-                Box::pin(async move {
-                    u.#method_name().await;
-                })
+    let methods = methods.iter().map(|(method_name, priority, is_async)| {
+        if *is_async {
+            quote! {
+                fn #method_name(u: &mut #struct_name) -> ::core::pin::Pin<Box<dyn ::core::future::Future<Output = ()> + ::core::marker::Send + '_>> {
+                    Box::pin(async move {
+                        u.#method_name().await;
+                    })
+                }
+                self.async_tasks.push(rocust_lib::tasks::AsyncTask::new(#priority, #method_name));
             }
-            self.tasks.push(rocust_lib::tasks::Task::new(#priority, #method_name));
         }
+        else {
+            quote! {
+                fn #method_name(u: &mut #struct_name) {
+                    u.#method_name();
+                }
+                self.tasks.push(rocust_lib::tasks::Task::new(#priority, #method_name));
+            }
+        }
+
     });
 
     //now we can implement the function in the User trait that will inject the tasks in the user struct
-
     let expanded = quote! {
         #impl_block
 
@@ -130,6 +151,10 @@ pub fn has_task(_attrs: TokenStream, item: TokenStream) -> TokenStream {
                 self.results.add_fail(dummy);
             }
 
+            fn get_async_tasks(&self) -> Vec<rocust_lib::tasks::AsyncTask<Self>> where Self: Sized {
+                self.async_tasks.clone()
+            }
+
             fn get_tasks(&self) -> Vec<rocust_lib::tasks::Task<Self>> where Self: Sized {
                 self.tasks.clone()
             }
@@ -139,79 +164,3 @@ pub fn has_task(_attrs: TokenStream, item: TokenStream) -> TokenStream {
 
     expanded.into()
 }
-
-// #[proc_macro_attribute]
-// pub fn task(attr: TokenStream, item: TokenStream) -> TokenStream {
-//     let method = syn::parse_macro_input!(item as syn::ItemFn);
-
-//     // Break the function down into its parts
-//     let syn::ItemFn {
-//         attrs: _,
-//         vis: _,
-//         sig,
-//         block: _,
-//     } = &method;
-
-//     // Ensure that it isn't an `async fn`
-//     if let Some(async_token) = sig.asyncness {
-//         // Error out if so
-//         let error = syn::Error::new(
-//             async_token.span(),
-//             "async functions do not support caller tracking functionality
-//     help: consider returning `impl Future` instead",
-//         );
-
-//         return TokenStream::from(error.to_compile_error());
-//     }
-
-//     let struct_name = method.sig.ident.to_string();
-//     let new_struct_name = format!("{}_{}", struct_name, method.sig.ident);
-
-//     let new_struct_name = syn::Ident::new(&new_struct_name, method.sig.ident.span());
-
-//     // Extracting field name and value
-//     let attr_string = attr.to_string();
-//     let field_name_value:Vec<&str> = attr_string.split("=").collect();
-//     let field_name = field_name_value[0].trim();
-//     if field_name != "priority"{
-//         panic!("The only argument that can be passed to the macro is priority");
-//     }
-//     let field_value = field_name_value[1].trim();
-//     if field_value != "1" && field_value != "2" && field_value != "3"{
-//         panic!("The only values that can be passed to the macro are 1, 2, or 3");
-//     }
-
-//     let expanded = quote! {
-//         // struct #new_struct_name {
-//         //     #field_name: String = #field_value
-//         // }
-//         // the problem is: this macro will spit out the struct inside an impl block!
-//     };
-//     expanded.into()
-// }
-
-// #[proc_macro_derive(User)]
-// pub fn derive(input: TokenStream) -> TokenStream {
-//     let ast = parse_macro_input!(input as DeriveInput);
-//     let name = &ast.ident;
-
-//     let expanded = quote! {
-//         impl #name {
-//             fn with_tasks(mut self, tasks: Vec<rocust_lib::tasks::Task<Self>>) -> Self {
-//                 self.tasks = tasks;
-//                 self
-//             }
-//         }
-
-//         impl rocust_lib::traits::User for #name {
-//             fn add_succ(&mut self, dummy: i32) {
-//                 self.results.add_succ(dummy);
-//             }
-//             fn add_fail(&mut self, dummy: i32) {
-//                 self.results.add_fail(dummy);
-//             }
-//         }
-//     };
-
-//     expanded.into()
-// }

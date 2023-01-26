@@ -1,5 +1,4 @@
 use std::sync::Arc;
-
 use crate::traits::{HasTask, User};
 use tokio::sync::Notify;
 
@@ -21,30 +20,6 @@ impl Test {
         }
     }
 
-    // no need
-    // pub async fn run<T>(&self) -> Status
-    // where
-    //     T: HasTask + User + Default + Send,
-    // {
-    //     tokio::select! {
-    //         _ = self.run_users::<T>() => {
-    //             println!("run_users finished");
-    //             unreachable!()
-    //         }
-    //         _ = self.notify.notified() => {
-    //             println!("notify finished");
-    //             //this is the ctrl+c
-    //             Status::Stopped
-    //         }
-    //         _ = tokio::time::sleep(std::time::Duration::from_secs(5)) => {
-    //             //this is the run time
-    //             println!("sleep finished");
-    //             Status::Finished
-    //         }
-    //     }
-    //     // we still need to run the on_stop
-    // }
-
     pub async fn run<T>(&self)
     where
         T: HasTask + User + Default + Send,
@@ -57,7 +32,7 @@ impl Test {
                 let mut user = T::default();
                 user.inject_tasks();
                 user.on_start();
-                let tasks = user.get_tasks();
+                let tasks = user.get_async_tasks();
                 loop {
                     // get a random task
                     // call it
@@ -104,5 +79,12 @@ impl Test {
 
         timer.await.unwrap();
         println!("terminating");
+    }
+
+    pub async fn run_blocking<T>(&self)
+    where
+        T: HasTask + User + Default + Send + 'static,
+    {
+        
     }
 }

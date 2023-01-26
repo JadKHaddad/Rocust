@@ -2,17 +2,17 @@ use std::future::Future;
 use std::pin::Pin;
 
 #[derive(Clone)]
-pub struct Task<T> {
+pub struct AsyncTask<T> {
     priority: i32,
     func: fn(&mut T) -> Pin<Box<dyn Future<Output = ()> + Send + '_>>,
 }
 
-impl<T> Task<T> {
+impl<T> AsyncTask<T> {
     pub fn new(
         priority: i32,
         func: fn(&mut T) -> Pin<Box<dyn Future<Output = ()> + Send + '_>>,
     ) -> Self {
-        Task { priority, func }
+        AsyncTask { priority, func }
     }
 
     pub fn get_priority(&self) -> i32 {
@@ -23,3 +23,24 @@ impl<T> Task<T> {
         (self.func)(user).await;
     }
 }
+
+#[derive(Clone)]
+pub struct Task<T> {
+    priority: i32,
+    func: fn(&mut T) -> (),
+}
+
+impl<T> Task<T> {
+    pub fn new(priority: i32, func: fn(&mut T) -> ()) -> Self {
+        Task { priority, func }
+    }
+
+    pub fn get_priority(&self) -> i32 {
+        self.priority
+    }
+
+    pub fn call(&self, user: &mut T) {
+        (self.func)(user);
+    }
+}
+

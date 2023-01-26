@@ -7,6 +7,7 @@ pub struct MyUser {
     a: i32,
     b: i32,
     //pub results: rocust_lib::results::Results
+    //pub async_tasks: Vec<rocust_lib::tasks::AsyncTask<Self>>
     //pub tasks: Vec<rocust_lib::tasks::Task<Self>>
 }
 
@@ -24,6 +25,7 @@ impl MyUser {
         println!("bar: {}", self.b);
     }
 
+    #[task(priority = 3)]
     pub fn print(&self) {
         println!("a: {}, b: {}", self.a, self.b);
     }
