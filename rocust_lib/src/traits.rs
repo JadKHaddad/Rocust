@@ -18,3 +18,26 @@ pub trait User {
 pub trait Prioritised {
     fn get_priority(&self) -> i32;
 }
+
+pub trait PrioritisedRandom<T>
+where
+    T: Prioritised,
+{
+    fn get_proioritised_random(&self) -> Option<&T>;
+}
+
+use rand::{distributions::WeightedIndex, prelude::Distribution};
+impl<T> PrioritisedRandom<T> for Vec<T>
+where
+    T: Prioritised,
+{
+    fn get_proioritised_random(&self) -> Option<&T> {
+        let weights: Vec<i32> = self.iter().map(|o| o.get_priority()).collect();
+        if let Ok(distrib) = WeightedIndex::new(weights) {
+            let mut rng = rand::thread_rng();
+            let idx = distrib.sample(&mut rng);
+            return self.get(idx);
+        }
+        None
+    }
+}

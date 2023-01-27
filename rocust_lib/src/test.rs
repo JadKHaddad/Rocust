@@ -1,7 +1,4 @@
-use crate::{
-    traits::{HasTask, User},
-    utils::choose_random_object,
-};
+use crate::traits::{HasTask, PrioritisedRandom, User};
 use std::sync::Arc;
 use tokio::sync::Notify;
 
@@ -29,6 +26,10 @@ impl Test {
     {
         let mut handles = vec![];
         let tasks = Arc::new(T::get_async_tasks());
+        if tasks.is_empty() {
+            println!("user has no tasks");
+            return;
+        }
         for i in 0..self.count {
             //control the spawn rate
             let notify = self.notify.clone();
@@ -39,7 +40,7 @@ impl Test {
                 user.on_start();
                 loop {
                     // get a random task
-                    let task = choose_random_object(&tasks).unwrap();
+                    let task = tasks.get_proioritised_random().unwrap();
                     // call it
                     let task_call_and_sleep = async {
                         task.call(&mut user).await;
