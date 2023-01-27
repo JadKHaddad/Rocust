@@ -4,18 +4,15 @@ use tokio::sync::Notify;
 
 pub struct Test {
     pub count: i32,
+    pub runtime: Option<u32>,
     pub notify: Arc<Notify>,
 }
 
-pub enum Status {
-    Running,
-    Stopped,
-    Finished,
-}
 impl Test {
-    pub fn new(count: i32) -> Self {
+    pub fn new(count: i32, runtime: Option<u32>) -> Self {
         Test {
             count,
+            runtime,
             notify: Arc::new(Notify::new()),
         }
     }
@@ -61,20 +58,29 @@ impl Test {
         }
         //start a timer in another task
         let notify = self.notify.clone();
-        let timer = tokio::spawn(async move {
-            // this is the run time
-            tokio::select! {
-                // this is the ctrl+c
-                _ = notify.notified() => {
-                    println!("received signal");
+
+        let timer = if let Some(runtime) = self.runtime {
+            println!("runtime: {}s", runtime);
+            tokio::spawn(async move {
+                tokio::select! {
+                    // this is the ctrl+c or any other signal
+                    _ = notify.notified() => {
+                        println!("received signal");
+                    }
+                    // this is the run time
+                    _ = tokio::time::sleep(std::time::Duration::from_secs(runtime as u64)) => {
+                        println!("timer finished");
+                        notify.notify_waiters();
+                    }
                 }
-                // this is the run time
-                _ = tokio::time::sleep(std::time::Duration::from_secs(10)) => {
-                    println!("timer finished");
-                    notify.notify_waiters();
-                }
-            }
-        });
+            })
+        } else {
+            println!("runtime: infinite");
+            tokio::spawn(async move {
+                // this is the ctrl+c or any other signal
+                notify.notified().await;
+            })
+        };
 
         for handle in handles {
             handle.await.unwrap();
