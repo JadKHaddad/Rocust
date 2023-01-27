@@ -1,4 +1,7 @@
-use crate::traits::{HasTask, User};
+use crate::{
+    traits::{HasTask, User},
+    utils::choose_random_object,
+};
 use std::sync::Arc;
 use tokio::sync::Notify;
 
@@ -22,26 +25,26 @@ impl Test {
 
     pub async fn run<T>(&self)
     where
-        T: HasTask + User + Default + Send,
+        T: HasTask + User + Default + Send + 'static,
     {
         let mut handles = vec![];
-        for _ in 0..self.count {
+        let tasks = Arc::new(T::get_async_tasks());
+        for i in 0..self.count {
             //control the spawn rate
             let notify = self.notify.clone();
+            let tasks = tasks.clone();
             let handle = tokio::spawn(async move {
                 let mut user = T::default();
-                user.inject_tasks();
+                user.on_create(i as u16);
                 user.on_start();
-                let tasks = user.get_async_tasks();
                 loop {
                     // get a random task
+                    let task = choose_random_object(&tasks).unwrap();
                     // call it
-                    let task = tasks.get(0).unwrap();
                     let task_call_and_sleep = async {
                         task.call(&mut user).await;
                         tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
                     };
-
                     // do some sleep or stop
                     tokio::select! {
                         _ = notify.notified() => {

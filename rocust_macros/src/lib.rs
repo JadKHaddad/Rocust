@@ -15,18 +15,6 @@ pub fn user(_attrs: TokenStream, item: TokenStream) -> TokenStream {
                             .parse2(quote! { pub results: rocust_lib::results::Results })
                             .unwrap(),
                     );
-                    fields.named.push(
-                        syn::Field::parse_named
-                            .parse2(quote! { pub tasks: Vec<rocust_lib::tasks::Task<Self>> })
-                            .unwrap(),
-                    );
-                    fields.named.push(
-                        syn::Field::parse_named
-                            .parse2(
-                                quote! { pub async_tasks: Vec<rocust_lib::tasks::AsyncTask<Self>> },
-                            )
-                            .unwrap(),
-                    );
                 }
                 _ => (),
             }
@@ -87,12 +75,11 @@ pub fn has_task(_attrs: TokenStream, item: TokenStream) -> TokenStream {
 
                     if let TokenTree::Literal(lit) = iter.next().unwrap() {
                         if let Ok(priority) = lit.to_string().parse::<i32>() {
+                            if method.sig.asyncness.is_none() {
+                                panic!("Only async methods are supported");
+                            }
                             let priority = syn::LitInt::new(&priority.to_string(), lit.span());
-                            methods.push((
-                                method.sig.ident.clone(),
-                                priority,
-                                method.sig.asyncness.is_some(),
-                            ));
+                            methods.push((method.sig.ident.clone(), priority));
                         } else {
                             panic!("Only i32 is supported");
                         }
@@ -103,33 +90,18 @@ pub fn has_task(_attrs: TokenStream, item: TokenStream) -> TokenStream {
             }
 
             //remove the attribute
-            method.attrs.retain(|attr| {
-                if attr.path.is_ident("task") {
-                    return false;
-                }
-                true
-            });
+            method.attrs.retain(|attr| !attr.path.is_ident("task"));
         }
     }
 
-    let methods = methods.iter().map(|(method_name, priority, is_async)| {
-        if *is_async {
-            quote! {
-                fn #method_name(u: &mut #struct_name) -> ::core::pin::Pin<Box<dyn ::core::future::Future<Output = ()> + ::core::marker::Send + '_>> {
-                    Box::pin(async move {
-                        u.#method_name().await;
-                    })
-                }
-                self.async_tasks.push(rocust_lib::tasks::AsyncTask::new(#priority, #method_name));
+    let methods = methods.iter().map(|(method_name, priority)| {
+        quote! {
+            fn #method_name(u: &mut #struct_name) -> ::core::pin::Pin<Box<dyn ::core::future::Future<Output = ()> + ::core::marker::Send + '_>> {
+                Box::pin(async move {
+                    u.#method_name().await;
+                })
             }
-        }
-        else {
-            quote! {
-                fn #method_name(u: &mut #struct_name) {
-                    u.#method_name();
-                }
-                self.tasks.push(rocust_lib::tasks::Task::new(#priority, #method_name));
-            }
+            async_tasks.push(rocust_lib::tasks::AsyncTask::new(#priority, #method_name));
         }
 
     });
@@ -139,10 +111,6 @@ pub fn has_task(_attrs: TokenStream, item: TokenStream) -> TokenStream {
         #impl_block
 
         impl rocust_lib::traits::HasTask for #struct_name {
-            fn inject_tasks(&mut self) {
-                #(#methods)*
-            }
-
             fn add_succ(&mut self, dummy: i32) {
                 self.results.add_succ(dummy);
             }
@@ -151,14 +119,11 @@ pub fn has_task(_attrs: TokenStream, item: TokenStream) -> TokenStream {
                 self.results.add_fail(dummy);
             }
 
-            fn get_async_tasks(&self) -> Vec<rocust_lib::tasks::AsyncTask<Self>> where Self: Sized {
-                self.async_tasks.clone()
+            fn get_async_tasks() -> Vec<rocust_lib::tasks::AsyncTask<Self>> where Self: Sized {
+                let mut async_tasks: Vec<rocust_lib::tasks::AsyncTask<Self>> = Vec::new();
+                #(#methods)*;
+                async_tasks
             }
-
-            fn get_tasks(&self) -> Vec<rocust_lib::tasks::Task<Self>> where Self: Sized {
-                self.tasks.clone()
-            }
-
         }
     };
 

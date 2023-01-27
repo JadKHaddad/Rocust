@@ -1,7 +1,7 @@
 use crate::traits::Prioritised;
 use rand::{distributions::WeightedIndex, prelude::Distribution};
 
-pub fn choose_random_object<T>(objects: &Vec<T>) -> &T
+pub fn choose_random_object<T>(objects: &Vec<T>) -> Option<&T>
 where
     T: Prioritised,
 {
@@ -9,5 +9,5 @@ where
     let distrib = WeightedIndex::new(weights).unwrap();
     let mut rng = rand::thread_rng();
     let idx = distrib.sample(&mut rng);
-    &objects[idx]
+    objects.get(idx)
 }
