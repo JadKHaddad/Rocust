@@ -1,6 +1,8 @@
 use std::future::Future;
 use std::pin::Pin;
 
+use crate::traits::Prioritised;
+
 #[derive(Clone)]
 pub struct AsyncTask<T> {
     priority: i32,
@@ -24,6 +26,12 @@ impl<T> AsyncTask<T> {
     }
 }
 
+impl<T> Prioritised for AsyncTask<T> {
+    fn get_priority(&self) -> i32 {
+        self.priority
+    }
+}
+
 #[derive(Clone)]
 pub struct Task<T> {
     priority: i32,
@@ -43,4 +51,3 @@ impl<T> Task<T> {
         (self.func)(user);
     }
 }
-

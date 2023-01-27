@@ -20,3 +20,7 @@ pub trait User {
     fn on_start(&mut self) {}
     fn on_stop(&mut self) {}
 }
+
+pub trait Prioritised {
+    fn get_priority(&self) -> i32;
+}

@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use crate::traits::{HasTask, User};
+use std::sync::Arc;
 use tokio::sync::Notify;
 
 pub struct Test {
@@ -85,6 +85,5 @@ impl Test {
     where
         T: HasTask + User + Default + Send + 'static,
     {
-        
     }
 }
