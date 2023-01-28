@@ -37,7 +37,7 @@ impl ResultSender {
     }
 
     pub async fn send_success(
-        &mut self,
+        &self,
         r#type: String,
         name: String,
         response_time: f64,
@@ -55,7 +55,7 @@ impl ResultSender {
     }
 
     pub async fn send_fail(
-        &mut self,
+        &self,
         r#type: String,
         name: String,
     ) -> Result<(), SendError<ResultMessage>> {
@@ -68,7 +68,7 @@ impl ResultSender {
     }
 
     pub async fn send_error(
-        &mut self,
+        &self,
         r#type: String,
         name: String,
         error: String,
