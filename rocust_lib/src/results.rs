@@ -26,12 +26,22 @@ pub struct ResultReceiver {
     pub receiver: Receiver<ResultMessage>,
 }
 
+impl ResultReceiver {
+    pub fn new(results: Results, receiver: Receiver<ResultMessage>) -> Self {
+        Self { results, receiver }
+    }
+}
+
 #[derive(Default)]
 pub struct ResultSender {
     pub sender: Option<Sender<ResultMessage>>,
 }
 
 impl ResultSender {
+    pub fn new(sender: Option<Sender<ResultMessage>>) -> Self {
+        Self { sender }
+    }
+
     pub fn set_sender(&mut self, sender: Sender<ResultMessage>) {
         self.sender = Some(sender);
     }
