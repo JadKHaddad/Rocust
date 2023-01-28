@@ -1,21 +1,110 @@
-#[derive(Clone)]
-pub struct Results {
-    pub succ: i32,
-    pub fail: i32,
-}
+use tokio::sync::mpsc::error::SendError;
+use tokio::sync::mpsc::{Receiver, Sender};
 
-impl Default for Results {
-    fn default() -> Self {
-        Results { succ: 0, fail: 0 }
-    }
+#[derive(Clone, Default)]
+pub struct Results {
+    pub total_requests: u32,
+    pub total_failed_requests: u32,
+    pub total_errors: u32,
+    pub total_response_time: f64,
+    pub average_response_time: f64,
+    pub min_response_time: f64,
+    pub median_response_time: f64,
+    pub max_response_time: f64,
+    pub requests_per_second: f64,
+    pub failed_requests_per_second: f64,
 }
 
 impl Results {
-    pub fn add_succ(&mut self, _dummy: i32) {
-        self.succ += 1;
+    pub fn add_succ(&mut self, _dummy: i32) {}
+
+    pub fn add_fail(&mut self, _dummy: i32) {}
+}
+
+pub struct ResultReceiver {
+    pub results: Results,
+    pub receiver: Receiver<ResultMessage>,
+}
+
+#[derive(Default)]
+pub struct ResultSender {
+    pub sender: Option<Sender<ResultMessage>>,
+}
+
+impl ResultSender {
+    pub fn set_sender(&mut self, sender: Sender<ResultMessage>) {
+        self.sender = Some(sender);
     }
 
-    pub fn add_fail(&mut self, _dummy: i32) {
-        self.fail += 1;
+    pub async fn send_success(
+        &mut self,
+        r#type: String,
+        name: String,
+        response_time: f64,
+    ) -> Result<(), SendError<ResultMessage>> {
+        if let Some(sender) = &self.sender {
+            return sender
+                .send(ResultMessage::Success(SuccessResultMessage {
+                    r#type,
+                    name,
+                    response_time,
+                }))
+                .await;
+        }
+        unreachable!();
     }
+
+    pub async fn send_fail(
+        &mut self,
+        r#type: String,
+        name: String,
+    ) -> Result<(), SendError<ResultMessage>> {
+        if let Some(sender) = &self.sender {
+            return sender
+                .send(ResultMessage::Fail(FailResultMessage { r#type, name }))
+                .await;
+        }
+        unreachable!();
+    }
+
+    pub async fn send_error(
+        &mut self,
+        r#type: String,
+        name: String,
+        error: String,
+    ) -> Result<(), SendError<ResultMessage>> {
+        if let Some(sender) = &self.sender {
+            return sender
+                .send(ResultMessage::Error(ErrorResultMessage {
+                    r#type,
+                    name,
+                    error,
+                }))
+                .await;
+        }
+        unreachable!();
+    }
+}
+
+pub enum ResultMessage {
+    Success(SuccessResultMessage),
+    Fail(FailResultMessage),
+    Error(ErrorResultMessage),
+}
+
+pub struct SuccessResultMessage {
+    pub r#type: String,
+    pub name: String,
+    pub response_time: f64,
+}
+
+pub struct FailResultMessage {
+    pub r#type: String,
+    pub name: String,
+}
+
+pub struct ErrorResultMessage {
+    pub r#type: String,
+    pub name: String,
+    pub error: String,
 }
