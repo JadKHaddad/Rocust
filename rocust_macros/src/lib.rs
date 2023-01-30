@@ -12,7 +12,9 @@ pub fn user(_attrs: TokenStream, item: TokenStream) -> TokenStream {
                 syn::Fields::Named(fields) => {
                     fields.named.push(
                         syn::Field::parse_named
-                            .parse2(quote! { pub results: rocust_lib::results::Results })
+                            .parse2(
+                                quote! { pub results_sender: rocust_lib::results::ResultsSender },
+                            )
                             .unwrap(),
                     );
                 }
@@ -111,18 +113,18 @@ pub fn has_task(_attrs: TokenStream, item: TokenStream) -> TokenStream {
         #impl_block
 
         impl rocust_lib::traits::HasTask for #struct_name {
-            fn add_succ(&mut self, dummy: i32) {
-                self.results.add_succ(dummy);
-            }
-
-            fn add_fail(&mut self, dummy: i32) {
-                self.results.add_fail(dummy);
-            }
-
             fn get_async_tasks() -> Vec<rocust_lib::tasks::AsyncTask<Self>> where Self: Sized {
                 let mut async_tasks: Vec<rocust_lib::tasks::AsyncTask<Self>> = Vec::new();
                 #(#methods)*;
                 async_tasks
+            }
+
+            fn get_results_sender(&self) -> &rocust_lib::results::ResultsSender{
+                &self.results_sender
+            }
+
+            fn set_sender(&mut self, sender: tokio::sync::mpsc::UnboundedSender<rocust_lib::results::ResultMessage>){
+                self.results_sender.set_sender(sender);
             }
         }
     };

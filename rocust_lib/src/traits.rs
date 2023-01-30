@@ -1,12 +1,17 @@
+use crate::results::ResultMessage;
+use tokio::sync::mpsc::UnboundedSender;
+
 pub trait HasTask {
-    fn add_succ(&mut self, dummy: i32);
-    fn add_fail(&mut self, dummy: i32);
     fn get_async_tasks() -> Vec<crate::tasks::AsyncTask<Self>>
     where
         Self: Sized,
     {
         vec![]
     }
+
+    fn get_results_sender(&self) -> &ResultsSender;
+
+    fn set_sender(&mut self, sender: UnboundedSender<ResultMessage>);
 }
 
 pub trait User {
@@ -27,6 +32,8 @@ where
 }
 
 use rand::{distributions::WeightedIndex, prelude::Distribution};
+
+use crate::results::ResultsSender;
 impl<T> PrioritisedRandom<T> for Vec<T>
 where
     T: Prioritised,
