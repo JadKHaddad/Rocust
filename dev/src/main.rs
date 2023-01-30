@@ -54,6 +54,5 @@ async fn main() {
         notify.notify_waiters();
     });
 
-    //will panice because user has not tasks
     test.run::<MyUser>().await;
 }
