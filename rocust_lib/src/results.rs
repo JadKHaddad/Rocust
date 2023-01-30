@@ -1,5 +1,5 @@
-use tokio::sync::mpsc::error::SendError;
-use tokio::sync::mpsc::{Receiver, Sender};
+use std::collections::HashMap;
+use tokio::sync::mpsc::{error::SendError, Sender};
 
 #[derive(Clone, Default)]
 pub struct Results {
@@ -16,19 +16,72 @@ pub struct Results {
 }
 
 impl Results {
-    pub fn add_succ(&mut self, _dummy: i32) {}
+    pub fn add_success(&mut self, response_time: f64) {
+        self.total_response_time += response_time;
+        self.total_requests += 1;
+        self.average_response_time = self.total_response_time / self.total_requests as f64;
+        if self.min_response_time == 0.0 || response_time < self.min_response_time {
+            self.min_response_time = response_time;
+        }
+        if response_time > self.max_response_time {
+            self.max_response_time = response_time;
+        }
+    }
 
-    pub fn add_fail(&mut self, _dummy: i32) {}
+    pub fn add_failure(&mut self) {
+        self.total_requests += 1;
+        self.total_failed_requests += 1;
+    }
+
+    pub fn add_error(&mut self) {
+        self.total_errors += 1;
+    }
 }
 
-pub struct ResultReceiver {
-    pub results: Results,
-    pub receiver: Receiver<ResultMessage>,
+#[derive(Clone, Default, PartialEq, Eq, Hash)]
+pub struct EndpointTypeName(String, String);
+
+#[derive(Clone, Default)]
+pub struct AllResults {
+    pub aggrigated_results: Results,
+    pub endpoint_results: HashMap<EndpointTypeName, Results>,
 }
 
-impl ResultReceiver {
-    pub fn new(results: Results, receiver: Receiver<ResultMessage>) -> Self {
-        Self { results, receiver }
+impl AllResults {
+    pub fn add_success(&mut self, endpoint_type_name: EndpointTypeName, response_time: f64) {
+        self.aggrigated_results.add_success(response_time);
+        if let Some(endpoint_results) = self.endpoint_results.get_mut(&endpoint_type_name) {
+            endpoint_results.add_success(response_time);
+        } else {
+            let mut endpoint_results = Results::default();
+            endpoint_results.add_success(response_time);
+            self.endpoint_results
+                .insert(endpoint_type_name, endpoint_results);
+        }
+    }
+
+    pub fn add_failure(&mut self, endpoint_type_name: EndpointTypeName) {
+        self.aggrigated_results.add_failure();
+        if let Some(endpoint_results) = self.endpoint_results.get_mut(&endpoint_type_name) {
+            endpoint_results.add_failure();
+        } else {
+            let mut endpoint_results = Results::default();
+            endpoint_results.add_failure();
+            self.endpoint_results
+                .insert(endpoint_type_name, endpoint_results);
+        }
+    }
+
+    pub fn add_error(&mut self, endpoint_type_name: EndpointTypeName, _error: String) {
+        self.aggrigated_results.add_error();
+        if let Some(endpoint_results) = self.endpoint_results.get_mut(&endpoint_type_name) {
+            endpoint_results.add_error();
+        } else {
+            let mut endpoint_results = Results::default();
+            endpoint_results.add_error();
+            self.endpoint_results
+                .insert(endpoint_type_name, endpoint_results);
+        }
     }
 }
 
@@ -46,7 +99,7 @@ impl ResultSender {
         self.sender = Some(sender);
     }
 
-    pub async fn send_success(
+    pub async fn add_success(
         &self,
         r#type: String,
         name: String,
@@ -55,8 +108,7 @@ impl ResultSender {
         if let Some(sender) = &self.sender {
             return sender
                 .send(ResultMessage::Success(SuccessResultMessage {
-                    r#type,
-                    name,
+                    endpoint_type_name: EndpointTypeName(r#type, name),
                     response_time,
                 }))
                 .await;
@@ -64,20 +116,22 @@ impl ResultSender {
         unreachable!();
     }
 
-    pub async fn send_fail(
+    pub async fn add_failure(
         &self,
         r#type: String,
         name: String,
     ) -> Result<(), SendError<ResultMessage>> {
         if let Some(sender) = &self.sender {
             return sender
-                .send(ResultMessage::Fail(FailResultMessage { r#type, name }))
+                .send(ResultMessage::Failure(FailureResultMessage {
+                    endpoint_type_name: EndpointTypeName(r#type, name),
+                }))
                 .await;
         }
         unreachable!();
     }
 
-    pub async fn send_error(
+    pub async fn add_error(
         &self,
         r#type: String,
         name: String,
@@ -86,8 +140,7 @@ impl ResultSender {
         if let Some(sender) = &self.sender {
             return sender
                 .send(ResultMessage::Error(ErrorResultMessage {
-                    r#type,
-                    name,
+                    endpoint_type_name: EndpointTypeName(r#type, name),
                     error,
                 }))
                 .await;
@@ -98,23 +151,20 @@ impl ResultSender {
 
 pub enum ResultMessage {
     Success(SuccessResultMessage),
-    Fail(FailResultMessage),
+    Failure(FailureResultMessage),
     Error(ErrorResultMessage),
 }
 
 pub struct SuccessResultMessage {
-    pub r#type: String,
-    pub name: String,
+    pub endpoint_type_name: EndpointTypeName,
     pub response_time: f64,
 }
 
-pub struct FailResultMessage {
-    pub r#type: String,
-    pub name: String,
+pub struct FailureResultMessage {
+    pub endpoint_type_name: EndpointTypeName,
 }
 
 pub struct ErrorResultMessage {
-    pub r#type: String,
-    pub name: String,
+    pub endpoint_type_name: EndpointTypeName,
     pub error: String,
 }

@@ -1,23 +1,37 @@
-use crate::traits::{HasTask, PrioritisedRandom, User};
+use crate::{
+    results::{AllResults, ResultMessage},
+    traits::{HasTask, PrioritisedRandom, User},
+};
 use std::sync::Arc;
-use tokio::sync::Notify;
+use tokio::sync::mpsc;
+use tokio::sync::{
+    mpsc::{Receiver, Sender},
+    Notify, RwLock,
+};
 
 pub struct Test {
-    pub count: i32,
+    pub user_count: i32,
     pub runtime: Option<u32>,
     pub notify: Arc<Notify>,
+    pub all_results_arc_rwlock: Arc<RwLock<AllResults>>,
+    pub results_tx: Sender<ResultMessage>,
+    pub results_rx: Receiver<ResultMessage>,
 }
 
 impl Test {
-    pub fn new(count: i32, runtime: Option<u32>) -> Self {
+    pub fn new(user_count: i32, runtime: Option<u32>) -> Self {
+        let (results_tx, results_rx) = mpsc::channel(1024);
         Test {
-            count,
+            user_count,
             runtime,
             notify: Arc::new(Notify::new()),
+            all_results_arc_rwlock: Arc::new(RwLock::new(AllResults::default())),
+            results_tx,
+            results_rx,
         }
     }
 
-    pub async fn run<T>(&self)
+    pub async fn run<T>(&mut self)
     where
         T: HasTask + User + Default + Send + 'static,
     {
@@ -27,7 +41,8 @@ impl Test {
             println!("user has no tasks");
             return;
         }
-        for i in 0..self.count {
+
+        for i in 0..self.user_count {
             //control the spawn rate
             let notify = self.notify.clone();
             let tasks = tasks.clone();
@@ -58,8 +73,7 @@ impl Test {
         }
         //start a timer in another task
         let notify = self.notify.clone();
-
-        let timer = if let Some(runtime) = self.runtime {
+        let timer_handle = if let Some(runtime) = self.runtime {
             println!("runtime: {}s", runtime);
             tokio::spawn(async move {
                 tokio::select! {
@@ -81,19 +95,35 @@ impl Test {
                 notify.notified().await;
             })
         };
+        //start the printer in another task
+
+        //start the reciever
+        while let Some(result_msg) = self.results_rx.recv().await {
+            let mut all_results_gaurd = self.all_results_arc_rwlock.write().await;
+            match result_msg {
+                ResultMessage::Success(sucess_result_msg) => {
+                    all_results_gaurd.add_success(
+                        sucess_result_msg.endpoint_type_name,
+                        sucess_result_msg.response_time,
+                    );
+                }
+                ResultMessage::Failure(failure_result_msg) => {
+                    all_results_gaurd.add_failure(failure_result_msg.endpoint_type_name);
+                }
+                ResultMessage::Error(error_result_msg) => {
+                    all_results_gaurd
+                        .add_error(error_result_msg.endpoint_type_name, error_result_msg.error);
+                }
+            }
+        }
+        println!("reciever dropped");
 
         for handle in handles {
             handle.await.unwrap();
         }
         println!("all users finished");
 
-        timer.await.unwrap();
+        timer_handle.await.unwrap();
         println!("terminating");
-    }
-
-    pub async fn run_blocking<T>(&self)
-    where
-        T: HasTask + User + Default + Send + 'static,
-    {
     }
 }
