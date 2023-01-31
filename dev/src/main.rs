@@ -44,9 +44,10 @@ impl rocust_lib::traits::User for MyUser {
         println!("on_stop");
     }
 }
+
 #[tokio::main]
 async fn main() {
-    let mut test = rocust_lib::test::Test::new(3, None);
+    let test = rocust_lib::test::Test::new(3, None);
     let notify = test.notify.clone();
 
     tokio::spawn(async move {
