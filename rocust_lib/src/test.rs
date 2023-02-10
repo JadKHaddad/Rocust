@@ -76,9 +76,10 @@ impl Test {
                         if let Some(task) = tasks.get_proioritised_random() {
                             // call it
                             let task_call_and_sleep = async {
-                                task.call(&mut user).await;
                                 // this is the sleep time of a user
                                 Test::sleep_between(between).await;
+                                // this is the actual task
+                                task.call(&mut user).await;
                             };
                             // do some sleep or stop
                             tokio::select! {
