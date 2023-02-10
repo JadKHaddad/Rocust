@@ -57,11 +57,11 @@ impl rocust_lib::traits::User for MyUser {
 
 #[tokio::main]
 async fn main() {
-    let test = rocust_lib::test::Test::new(3, None);
+    let test = rocust_lib::test::Test::new(12, 1, None);
     let notify = test.notify.clone();
 
     tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(25)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
         notify.notify_waiters();
     });
 

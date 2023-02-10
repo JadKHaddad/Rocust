@@ -8,6 +8,7 @@ use tokio::sync::{Notify, RwLock};
 use tokio::{sync::mpsc, time::Instant};
 pub struct Test {
     pub user_count: u64,
+    pub users_per_second: u64,
     pub runtime: Option<u64>,
     pub notify: Arc<Notify>,
     pub all_results_arc_rwlock: Arc<RwLock<AllResults>>,
@@ -15,9 +16,10 @@ pub struct Test {
 }
 
 impl Test {
-    pub fn new(user_count: u64, runtime: Option<u64>) -> Self {
+    pub fn new(user_count: u64, users_per_second: u64, runtime: Option<u64>) -> Self {
         Test {
             user_count,
+            users_per_second,
             runtime,
             notify: Arc::new(Notify::new()),
             all_results_arc_rwlock: Arc::new(RwLock::new(AllResults::default())),
@@ -33,7 +35,6 @@ impl Test {
     where
         T: HasTask + User + Default + Send + 'static,
     {
-        let mut handles = vec![];
         let tasks = Arc::new(T::get_async_tasks());
         if tasks.is_empty() {
             println!("user has no tasks");
@@ -42,39 +43,63 @@ impl Test {
         //set timestamp
         *self.start_timestamp_arc_rwlock.write().await = Instant::now();
 
+        //spawm users in other task
         let (results_tx, mut results_rx) = mpsc::unbounded_channel();
-        for i in 0..self.user_count {
-            //control the spawn rate
-            let notify = self.notify.clone();
-            let tasks = tasks.clone();
-            let results_tx = results_tx.clone();
-            let handle = tokio::spawn(async move {
-                let mut user = T::default();
-                user.set_sender(results_tx);
-                user.on_create(i as u16);
-                user.on_start();
-                loop {
-                    // get a random task
-                    let task = tasks.get_proioritised_random().unwrap();
-                    // call it
-                    let task_call_and_sleep = async {
-                        task.call(&mut user).await;
-                        // this is the sleep time of a user
-                        tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
-                    };
-                    // do some sleep or stop
+        let results_tx_clone = results_tx.clone();
+        let users_per_second = self.users_per_second;
+        let notify = self.notify.clone();
+        let user_count = self.user_count;
+
+        let users_spawn_handle = tokio::spawn(async move {
+            let mut handles = vec![];
+            let mut users_spawned = 0;
+            for i in 0..user_count {
+                let user_notify = notify.clone();
+                let spawn_notify = user_notify.clone();
+                let tasks = tasks.clone();
+                let results_tx_clone = results_tx_clone.clone();
+                let handle = tokio::spawn(async move {
+                    let mut user = T::default();
+                    user.set_sender(results_tx_clone);
+                    user.on_create(i as u16);
+                    user.on_start();
+                    loop {
+                        // get a random task
+                        if let Some(task) = tasks.get_proioritised_random() {
+                            // call it
+                            let task_call_and_sleep = async {
+                                task.call(&mut user).await;
+                                // this is the sleep time of a user
+                                tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+                            };
+                            // do some sleep or stop
+                            tokio::select! {
+                                _ = user_notify.notified() => {
+                                    break;
+                                }
+                                _ = task_call_and_sleep => {
+                                }
+                            }
+                        }
+                    }
+                    user.on_stop();
+                });
+                handles.push(handle);
+                users_spawned += 1;
+                if users_spawned % users_per_second == 0 {
                     tokio::select! {
-                        _ = notify.notified() => {
+                        _ = spawn_notify.notified() => {
                             break;
                         }
-                        _ = task_call_and_sleep => {
+                        _ = tokio::time::sleep(std::time::Duration::from_secs(1)) => {
+                            users_spawned = 0;
                         }
                     }
                 }
-                user.on_stop();
-            });
-            handles.push(handle);
-        }
+            }
+            handles
+        });
+
         //start a timer in another task
         let notify = self.notify.clone();
         let timer_handle = if let Some(runtime) = self.runtime {
@@ -99,11 +124,11 @@ impl Test {
                 notify.notified().await;
             })
         };
-        //start the printer in another task
+        //start the background tasks in another task (calculating stats, printing stats, managing files)
         let notify = self.notify.clone();
         let all_results_arc_rwlock = self.all_results_arc_rwlock.clone();
         let start_timestamp_arc_rwlock = self.start_timestamp_arc_rwlock.clone();
-        let printer_handle = tokio::spawn(async move {
+        let background_tasks_handle = tokio::spawn(async move {
             loop {
                 tokio::select! {
                     _ = notify.notified() => {
@@ -184,11 +209,13 @@ impl Test {
             }
         }
         println!("reciever dropped");
-        for handle in handles {
-            handle.await.unwrap();
+        if let Ok(handles) = users_spawn_handle.await {
+            for handle in handles {
+                handle.await.unwrap();
+            }
         }
         println!("all users finished");
-        printer_handle.await.unwrap();
+        background_tasks_handle.await.unwrap();
         timer_handle.await.unwrap();
         println!("terminating");
     }
