@@ -9,6 +9,10 @@ pub trait HasTask {
         vec![]
     }
 
+    fn get_between() -> (u64, u64) {
+        (0, 0)
+    }
+
     fn get_results_sender(&self) -> &ResultsSender;
 
     fn set_sender(&mut self, sender: UnboundedSender<ResultMessage>);

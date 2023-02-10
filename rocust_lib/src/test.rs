@@ -3,6 +3,7 @@ use crate::{
     traits::{HasTask, PrioritisedRandom, User},
 };
 use prettytable::{row, Table};
+use rand::Rng;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::{Notify, RwLock};
 use tokio::{sync::mpsc, time::Instant};
@@ -31,6 +32,11 @@ impl Test {
         Instant::now().duration_since(*start_timestamp)
     }
 
+    async fn sleep_between(between: (u64, u64)) {
+        let between = rand::thread_rng().gen_range(between.0..between.1);
+        tokio::time::sleep(Duration::from_secs(between)).await;
+    }
+
     pub async fn run<T>(&self)
     where
         T: HasTask + User + Default + Send + 'static,
@@ -40,6 +46,8 @@ impl Test {
             println!("user has no tasks");
             return;
         }
+        let between = T::get_between();
+
         //set timestamp
         *self.start_timestamp_arc_rwlock.write().await = Instant::now();
 
@@ -70,7 +78,7 @@ impl Test {
                             let task_call_and_sleep = async {
                                 task.call(&mut user).await;
                                 // this is the sleep time of a user
-                                tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+                                Test::sleep_between(between).await;
                             };
                             // do some sleep or stop
                             tokio::select! {

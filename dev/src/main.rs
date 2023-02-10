@@ -9,7 +9,7 @@ pub struct MyUser {
     //pub results_sener: rocust_lib::results::ResultsSender
 }
 
-#[rocust_macros::has_task]
+#[rocust_macros::has_task(between = "(1, 3)")]
 impl MyUser {
     #[task(priority = 1)]
     pub async fn foo(&mut self) {
@@ -61,7 +61,7 @@ async fn main() {
     let notify = test.notify.clone();
 
     tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
         notify.notify_waiters();
     });
 

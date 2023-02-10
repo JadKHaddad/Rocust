@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenTree;
 use quote::quote;
-use syn::{parse::Parser, parse_macro_input, DeriveInput};
+use syn::{parse::Parser, parse_macro_input, AttributeArgs, DeriveInput};
 
 #[proc_macro_attribute]
 pub fn user(_attrs: TokenStream, item: TokenStream) -> TokenStream {
@@ -31,8 +31,44 @@ pub fn user(_attrs: TokenStream, item: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-pub fn has_task(_attrs: TokenStream, item: TokenStream) -> TokenStream {
+pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
+    let attrs = parse_macro_input!(attrs as AttributeArgs);
     let mut impl_block = syn::parse_macro_input!(item as syn::ItemImpl);
+    //check if between is set
+    let mut min = 0;
+    let mut max = 0;
+    for attr in attrs {
+        if let syn::NestedMeta::Meta(syn::Meta::NameValue(name_value)) = attr {
+            if name_value.path.get_ident().unwrap().to_string() == "between" {
+                if let syn::Lit::Str(lit_str) = name_value.lit {
+                    let between_str = lit_str.value();
+                    let between_str = between_str.split_whitespace().collect::<String>();
+                    if between_str.starts_with('(') && between_str.ends_with(')') {
+                        let between_str = &between_str[1..between_str.len() - 1];
+                        let between_str = between_str.trim();
+                        let between_str = between_str.split(',');
+                        let between_str = between_str.collect::<Vec<&str>>();
+                        if between_str.len() != 2 {
+                            panic!("between has to have 2 values");
+                        }
+                        min = between_str[0].parse::<u64>().unwrap();
+                        max = between_str[1].parse::<u64>().unwrap();
+                    } else {
+                        panic!("between has to be in the format (min, max)");
+                    }
+                } else {
+                    panic!("between has to be a string");
+                }
+            } else {
+                panic!("Only between is supported");
+            }
+        } else {
+            panic!("Only Meta is supported");
+        }
+    }
+    let min = syn::LitInt::new(&min.to_string(), proc_macro2::Span::call_site());
+    let max = syn::LitInt::new(&max.to_string(), proc_macro2::Span::call_site());
+
     let struct_name = if let syn::Type::Path(type_path) = &impl_block.self_ty.as_ref() {
         if let Some(ident) = type_path.path.get_ident() {
             ident
@@ -117,6 +153,10 @@ pub fn has_task(_attrs: TokenStream, item: TokenStream) -> TokenStream {
                 let mut async_tasks: Vec<rocust_lib::tasks::AsyncTask<Self>> = Vec::new();
                 #(#methods)*;
                 async_tasks
+            }
+
+            fn get_between() -> (u64, u64) {
+                (#min, #max)
             }
 
             fn get_results_sender(&self) -> &rocust_lib::results::ResultsSender{
