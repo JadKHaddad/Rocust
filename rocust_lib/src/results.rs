@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 use tokio::sync::mpsc::{error::SendError, UnboundedSender};
 
 #[derive(Debug, Default, Clone)]
@@ -36,10 +36,27 @@ impl Results {
     pub fn add_error(&mut self) {
         self.total_errors += 1;
     }
+
+    fn calculate_requests_per_second(&mut self, elapsed: &Duration) {
+        let total_requests = self.total_requests;
+        let requests_per_second = total_requests as f64 / elapsed.as_secs_f64();
+        self.requests_per_second = requests_per_second;
+    }
+
+    fn calculate_failed_requests_per_second(&mut self, elapsed: &Duration) {
+        let total_failed_requests = self.total_failed_requests;
+        let failed_requests_per_second = total_failed_requests as f64 / elapsed.as_secs_f64();
+        self.failed_requests_per_second = failed_requests_per_second;
+    }
+
+    pub fn calculate_per_second(&mut self, elapsed: &Duration) {
+        self.calculate_requests_per_second(elapsed);
+        self.calculate_failed_requests_per_second(elapsed);
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
-pub struct EndpointTypeName(String, String);
+pub struct EndpointTypeName(pub String, pub String);
 
 #[derive(Debug, Default, Clone)]
 pub struct AllResults {
@@ -81,6 +98,13 @@ impl AllResults {
             endpoint_results.add_error();
             self.endpoint_results
                 .insert(endpoint_type_name, endpoint_results);
+        }
+    }
+
+    pub fn calculate_per_second(&mut self, elapsed: &Duration) {
+        self.aggrigated_results.calculate_per_second(elapsed);
+        for (_, endpoint_results) in self.endpoint_results.iter_mut() {
+            endpoint_results.calculate_per_second(elapsed);
         }
     }
 }

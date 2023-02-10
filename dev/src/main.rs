@@ -15,14 +15,24 @@ impl MyUser {
     pub async fn foo(&mut self) {
         self.a += 1;
         println!("foo: {}", self.a);
-        rocust::rocust_lib::events::add_success(self, String::from("GET"), String::from("/"), 0.1);
+        rocust::rocust_lib::events::add_success(
+            self,
+            String::from("GET"),
+            String::from("/foo"),
+            0.1,
+        );
     }
 
     #[task(priority = 3)]
     pub async fn bar(&mut self) {
         self.b += 1;
         println!("bar: {}", self.b);
-        rocust::rocust_lib::events::add_success(self, String::from("GET"), String::from("/"), 0.1);
+        rocust::rocust_lib::events::add_success(
+            self,
+            String::from("GET"),
+            String::from("/bar"),
+            0.1,
+        );
     }
 
     //#[task(priority = 3)]
@@ -51,7 +61,7 @@ async fn main() {
     let notify = test.notify.clone();
 
     tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(25)).await;
         notify.notify_waiters();
     });
 
