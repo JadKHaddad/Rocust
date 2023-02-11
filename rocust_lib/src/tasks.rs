@@ -5,19 +5,19 @@ use crate::traits::Prioritised;
 
 #[derive(Clone)]
 pub struct AsyncTask<T> {
-    priority: i32,
+    priority: u64,
     func: fn(&mut T) -> Pin<Box<dyn Future<Output = ()> + Send + '_>>,
 }
 
 impl<T> AsyncTask<T> {
     pub fn new(
-        priority: i32,
+        priority: u64,
         func: fn(&mut T) -> Pin<Box<dyn Future<Output = ()> + Send + '_>>,
     ) -> Self {
         AsyncTask { priority, func }
     }
 
-    pub fn get_priority(&self) -> i32 {
+    pub fn get_priority(&self) -> u64 {
         self.priority
     }
 
@@ -27,7 +27,7 @@ impl<T> AsyncTask<T> {
 }
 
 impl<T> Prioritised for AsyncTask<T> {
-    fn get_priority(&self) -> i32 {
+    fn get_priority(&self) -> u64 {
         self.priority
     }
 }

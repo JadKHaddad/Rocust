@@ -10,7 +10,7 @@ pub struct MyUser {
     //pub results_sener: rocust_lib::results::ResultsSender
 }
 
-#[rocust_macros::has_task(between = "(3, 5)")]
+#[rocust_macros::has_task(between = "(3, 5)", weight = 4)]
 impl MyUser {
     #[task(priority = 1)]
     pub async fn foo(&mut self) {

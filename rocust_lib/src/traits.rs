@@ -13,6 +13,10 @@ pub trait HasTask {
         (0, 0)
     }
 
+    fn get_weight() -> u64 {
+        1
+    }
+
     fn get_results_sender(&self) -> &ResultsSender;
 
     fn set_sender(&mut self, sender: UnboundedSender<ResultMessage>);
@@ -25,7 +29,7 @@ pub trait User {
 }
 
 pub trait Prioritised {
-    fn get_priority(&self) -> i32;
+    fn get_priority(&self) -> u64;
 }
 
 pub trait PrioritisedRandom<T>
@@ -43,7 +47,7 @@ where
     T: Prioritised,
 {
     fn get_proioritised_random(&self) -> Option<&T> {
-        let weights: Vec<i32> = self.iter().map(|o| o.get_priority()).collect();
+        let weights: Vec<u64> = self.iter().map(|o| o.get_priority()).collect();
         if let Ok(distrib) = WeightedIndex::new(weights) {
             let mut rng = rand::thread_rng();
             let idx = distrib.sample(&mut rng);

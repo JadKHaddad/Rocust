@@ -37,6 +37,7 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
     //check if between is set
     let mut min = 0;
     let mut max = 0;
+    let mut weight = 1;
     for attr in attrs {
         if let syn::NestedMeta::Meta(syn::Meta::NameValue(name_value)) = attr {
             if name_value.path.get_ident().unwrap().to_string() == "between" {
@@ -59,8 +60,14 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
                 } else {
                     panic!("between has to be a string");
                 }
+            } else if name_value.path.get_ident().unwrap().to_string() == "weight" {
+                if let syn::Lit::Int(lit_str) = name_value.lit {
+                    weight = lit_str.base10_digits().parse::<u64>().unwrap();
+                } else {
+                    panic!("weight has to be a number");
+                }
             } else {
-                panic!("Only between is supported");
+                panic!("Only between and weight is supported");
             }
         } else {
             panic!("Only Meta is supported");
@@ -68,6 +75,7 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
     }
     let min = syn::LitInt::new(&min.to_string(), proc_macro2::Span::call_site());
     let max = syn::LitInt::new(&max.to_string(), proc_macro2::Span::call_site());
+    let weight = syn::LitInt::new(&weight.to_string(), proc_macro2::Span::call_site());
 
     let struct_name = if let syn::Type::Path(type_path) = &impl_block.self_ty.as_ref() {
         if let Some(ident) = type_path.path.get_ident() {
@@ -112,14 +120,14 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
                     };
 
                     if let TokenTree::Literal(lit) = iter.next().unwrap() {
-                        if let Ok(priority) = lit.to_string().parse::<i32>() {
+                        if let Ok(priority) = lit.to_string().parse::<u64>() {
                             if method.sig.asyncness.is_none() {
                                 panic!("Only async methods are supported");
                             }
                             let priority = syn::LitInt::new(&priority.to_string(), lit.span());
                             methods.push((method.sig.ident.clone(), priority));
                         } else {
-                            panic!("Only i32 is supported");
+                            panic!("Only u64 is supported");
                         }
                     } else {
                         panic!("Only Literal is supported");
@@ -157,6 +165,10 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
 
             fn get_between() -> (u64, u64) {
                 (#min, #max)
+            }
+
+            fn get_weight() -> u64 {
+                #weight
             }
 
             fn get_results_sender(&self) -> &rocust_lib::results::ResultsSender{
