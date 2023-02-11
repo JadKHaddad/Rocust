@@ -6,15 +6,16 @@ use rocust::rocust_macros;
 pub struct MyUser {
     a: i32,
     b: i32,
+    id: u16,
     //pub results_sener: rocust_lib::results::ResultsSender
 }
 
-#[rocust_macros::has_task(between = "(5, 10)")]
+#[rocust_macros::has_task(between = "(3, 5)")]
 impl MyUser {
     #[task(priority = 1)]
     pub async fn foo(&mut self) {
         self.a += 1;
-        println!("foo: {}", self.a);
+        println!("{}: foo: {}", self.id, self.a);
         rocust::rocust_lib::events::add_success(
             self,
             String::from("GET"),
@@ -26,7 +27,7 @@ impl MyUser {
     #[task(priority = 3)]
     pub async fn bar(&mut self) {
         self.b += 1;
-        println!("bar: {}", self.b);
+        println!("{} bar: {}", self.id, self.b);
         rocust::rocust_lib::events::add_success(
             self,
             String::from("GET"),
@@ -43,26 +44,27 @@ impl MyUser {
 
 impl rocust_lib::traits::User for MyUser {
     fn on_create(&mut self, id: u16) {
+        self.id = id;
         println!("on_create: {}", id);
     }
 
     fn on_start(&mut self) {
-        println!("on_start");
+        println!("on_start: {}", self.id);
     }
 
     fn on_stop(&mut self) {
-        println!("on_stop");
+        println!("on_stop: {}", self.id);
     }
 }
 
 #[tokio::main]
 async fn main() {
-    let test = rocust_lib::test::Test::new(12, 1, None);
-    let notify = test.notify.clone();
+    let test = rocust_lib::test::Test::new(20, 20, None);
+    let token = test.token.clone();
 
     tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-        notify.notify_waiters();
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        token.cancel();
     });
 
     test.run::<MyUser>().await;

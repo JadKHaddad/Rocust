@@ -2,16 +2,19 @@ use crate::{
     results::{AllResults, ResultMessage},
     traits::{HasTask, PrioritisedRandom, User},
 };
-use prettytable::{row, Table};
 use rand::Rng;
 use std::{sync::Arc, time::Duration};
-use tokio::sync::{Notify, RwLock};
-use tokio::{sync::mpsc, time::Instant};
+use tokio::{
+    sync::{mpsc, RwLock},
+    task::JoinHandle,
+    time::Instant,
+};
+use tokio_util::sync::CancellationToken;
 pub struct Test {
     pub user_count: u64,
     pub users_per_second: u64,
     pub runtime: Option<u64>,
-    pub notify: Arc<Notify>,
+    pub token: Arc<CancellationToken>,
     pub all_results_arc_rwlock: Arc<RwLock<AllResults>>,
     pub start_timestamp_arc_rwlock: Arc<RwLock<Instant>>,
 }
@@ -22,7 +25,7 @@ impl Test {
             user_count,
             users_per_second,
             runtime,
-            notify: Arc::new(Notify::new()),
+            token: Arc::new(CancellationToken::new()),
             all_results_arc_rwlock: Arc::new(RwLock::new(AllResults::default())),
             start_timestamp_arc_rwlock: Arc::new(RwLock::new(Instant::now())),
         }
@@ -37,35 +40,29 @@ impl Test {
         tokio::time::sleep(Duration::from_secs(between)).await;
     }
 
-    pub async fn run<T>(&self)
+    fn spawn_users<T>(
+        &self,
+        results_tx: mpsc::UnboundedSender<ResultMessage>,
+    ) -> JoinHandle<Vec<JoinHandle<()>>>
     where
         T: HasTask + User + Default + Send + 'static,
     {
         let tasks = Arc::new(T::get_async_tasks());
         if tasks.is_empty() {
-            println!("user has no tasks");
-            return;
+            println!("Warning user has no tasks");
         }
         let between = T::get_between();
-
-        //set timestamp
-        *self.start_timestamp_arc_rwlock.write().await = Instant::now();
-
-        //spawm users in other task
-        let (results_tx, mut results_rx) = mpsc::unbounded_channel();
-        let results_tx_clone = results_tx.clone();
         let users_per_second = self.users_per_second;
-        let notify = self.notify.clone();
+        let token = self.token.clone();
         let user_count = self.user_count;
-
-        let users_spawn_handle = tokio::spawn(async move {
+        tokio::spawn(async move {
             let mut handles = vec![];
             let mut users_spawned = 0;
             for i in 0..user_count {
-                let user_notify = notify.clone();
-                let spawn_notify = user_notify.clone();
+                let user_token = token.clone();
+                let spawn_token = user_token.clone();
                 let tasks = tasks.clone();
-                let results_tx_clone = results_tx_clone.clone();
+                let results_tx_clone = results_tx.clone();
                 let handle = tokio::spawn(async move {
                     let mut user = T::default();
                     user.set_sender(results_tx_clone);
@@ -83,7 +80,7 @@ impl Test {
                             };
                             // do some sleep or stop
                             tokio::select! {
-                                _ = user_notify.notified() => {
+                                _ = user_token.cancelled() => {
                                     break;
                                 }
                                 _ = task_call_and_sleep => {
@@ -97,7 +94,7 @@ impl Test {
                 users_spawned += 1;
                 if users_spawned % users_per_second == 0 {
                     tokio::select! {
-                        _ = spawn_notify.notified() => {
+                        _ = spawn_token.cancelled() => {
                             break;
                         }
                         _ = tokio::time::sleep(std::time::Duration::from_secs(1)) => {
@@ -107,40 +104,46 @@ impl Test {
                 }
             }
             handles
-        });
+        })
+    }
 
-        //start a timer in another task
-        let notify = self.notify.clone();
-        let timer_handle = if let Some(runtime) = self.runtime {
-            println!("runtime: {}s", runtime);
-            tokio::spawn(async move {
-                tokio::select! {
+    fn start_timer(&self) -> JoinHandle<()> {
+        let token = self.token.clone();
+        match self.runtime {
+            Some(runtime) => {
+                println!("runtime: {}s", runtime);
+                tokio::spawn(async move {
+                    tokio::select! {
+                        // this is the ctrl+c or any other signal
+                        _ = token.cancelled() => {
+                            println!("received signal");
+                        }
+                        // this is the run time
+                        _ = tokio::time::sleep(std::time::Duration::from_secs(runtime)) => {
+                            println!("timer finished");
+                            token.cancel();
+                        }
+                    }
+                })
+            }
+            None => {
+                println!("runtime: infinite");
+                tokio::spawn(async move {
                     // this is the ctrl+c or any other signal
-                    _ = notify.notified() => {
-                        println!("received signal");
-                    }
-                    // this is the run time
-                    _ = tokio::time::sleep(std::time::Duration::from_secs(runtime)) => {
-                        println!("timer finished");
-                        notify.notify_waiters();
-                    }
-                }
-            })
-        } else {
-            println!("runtime: infinite");
-            tokio::spawn(async move {
-                // this is the ctrl+c or any other signal
-                notify.notified().await;
-            })
-        };
-        //start the background tasks in another task (calculating stats, printing stats, managing files)
-        let notify = self.notify.clone();
+                    token.cancelled().await;
+                })
+            }
+        }
+    }
+
+    fn start_background_tasks(&self) -> JoinHandle<()> {
+        let token = self.token.clone();
         let all_results_arc_rwlock = self.all_results_arc_rwlock.clone();
         let start_timestamp_arc_rwlock = self.start_timestamp_arc_rwlock.clone();
-        let background_tasks_handle = tokio::spawn(async move {
+        tokio::spawn(async move {
             loop {
                 tokio::select! {
-                    _ = notify.notified() => {
+                    _ = token.cancelled() => {
                         break;
                     }
                     _ = tokio::time::sleep(std::time::Duration::from_secs(2)) => {
@@ -149,56 +152,14 @@ impl Test {
                         let elapsed_time = Test::calculate_elapsed_time(&*start_timestamp_arc_rwlock.read().await);
                         all_results_gaurd.calculate_per_second(&elapsed_time);
                         //print stats
-                        let mut table = Table::new();
-                        table.add_row(row![
-                            "TYPE",
-                            "NAME",
-                            "TOTAL REQ",
-                            "FAILED REQ",
-                            "TOTAL ERR",
-                            "REQ/S",
-                            "FAILED REQ/S",
-                            "TOTAL RES TIME",
-                            "AVG RES TIME",
-                            "MIN RES TIME",
-                            "MAX RES TIME",
-                        ]);
-                        for (endpoint_type_name, results) in &all_results_gaurd.endpoint_results {
-                            table.add_row(row![
-                                endpoint_type_name.0,
-                                endpoint_type_name.1,
-                                results.total_requests,
-                                results.total_failed_requests,
-                                results.total_errors,
-                                results.requests_per_second,
-                                results.failed_requests_per_second,
-                                results.total_response_time,
-                                results.average_response_time,
-                                results.min_response_time,
-                                results.max_response_time,
-                            ]);
-                        }
-                        table.add_row(row![
-                            " ",
-                            "AGR",
-                            all_results_gaurd.aggrigated_results.total_requests,
-                            all_results_gaurd.aggrigated_results.total_failed_requests,
-                            all_results_gaurd.aggrigated_results.total_errors,
-                            all_results_gaurd.aggrigated_results.requests_per_second,
-                            all_results_gaurd.aggrigated_results.failed_requests_per_second,
-                            all_results_gaurd.aggrigated_results.total_response_time,
-                            all_results_gaurd.aggrigated_results.average_response_time,
-                            all_results_gaurd.aggrigated_results.min_response_time,
-                            all_results_gaurd.aggrigated_results.max_response_time,
-                        ]);
-                        table.printstd();
+                        all_results_gaurd.print_table();
                     }
                 }
             }
-        });
-        //drop the sender so the reciever will terminate when all users are done
-        drop(results_tx);
-        //start the reciever
+        })
+    }
+
+    async fn block_on_reciever(&self, mut results_rx: mpsc::UnboundedReceiver<ResultMessage>) {
         while let Some(result_msg) = results_rx.recv().await {
             let mut all_results_gaurd = self.all_results_arc_rwlock.write().await;
             match result_msg {
@@ -217,15 +178,41 @@ impl Test {
                 }
             }
         }
+    }
+
+    pub async fn run<T>(&self)
+    where
+        T: HasTask + User + Default + Send + 'static,
+    {
+        //set timestamp
+        *self.start_timestamp_arc_rwlock.write().await = Instant::now();
+        let (results_tx, results_rx) = mpsc::unbounded_channel();
+
+        let spawn_users_handles = self.spawn_users::<T>(results_tx);
+        //start a timer in another task
+        let timer_handle = self.start_timer();
+
+        //start the background tasks in another task (calculating stats, printing stats, managing files)
+        let background_tasks_handle = self.start_background_tasks();
+
+        //start the reciever
+        self.block_on_reciever(results_rx).await;
         println!("reciever dropped");
-        if let Ok(handles) = users_spawn_handle.await {
+
+        //wait for all users to finish
+        if let Ok(handles) = spawn_users_handles.await {
             for handle in handles {
                 handle.await.unwrap();
             }
         }
         println!("all users finished");
+
         background_tasks_handle.await.unwrap();
+        println!("background tasks finished");
+
         timer_handle.await.unwrap();
+        println!("timer finished");
+
         println!("terminating");
     }
 }

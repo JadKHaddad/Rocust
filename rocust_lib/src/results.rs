@@ -1,3 +1,4 @@
+use prettytable::{row, Table};
 use std::{collections::HashMap, time::Duration};
 use tokio::sync::mpsc::{error::SendError, UnboundedSender};
 
@@ -106,6 +107,52 @@ impl AllResults {
         for (_, endpoint_results) in self.endpoint_results.iter_mut() {
             endpoint_results.calculate_per_second(elapsed);
         }
+    }
+
+    pub fn print_table(&self) {
+        let mut table = Table::new();
+        table.add_row(row![
+            "TYPE",
+            "NAME",
+            "TOTAL REQ",
+            "FAILED REQ",
+            "TOTAL ERR",
+            "REQ/S",
+            "FAILED REQ/S",
+            "TOTAL RES TIME",
+            "AVG RES TIME",
+            "MIN RES TIME",
+            "MAX RES TIME",
+        ]);
+        for (endpoint_type_name, results) in &self.endpoint_results {
+            table.add_row(row![
+                endpoint_type_name.0,
+                endpoint_type_name.1,
+                results.total_requests,
+                results.total_failed_requests,
+                results.total_errors,
+                results.requests_per_second,
+                results.failed_requests_per_second,
+                results.total_response_time,
+                results.average_response_time,
+                results.min_response_time,
+                results.max_response_time,
+            ]);
+        }
+        table.add_row(row![
+            " ",
+            "AGR",
+            self.aggrigated_results.total_requests,
+            self.aggrigated_results.total_failed_requests,
+            self.aggrigated_results.total_errors,
+            self.aggrigated_results.requests_per_second,
+            self.aggrigated_results.failed_requests_per_second,
+            self.aggrigated_results.total_response_time,
+            self.aggrigated_results.average_response_time,
+            self.aggrigated_results.min_response_time,
+            self.aggrigated_results.max_response_time,
+        ]);
+        table.printstd();
     }
 }
 
