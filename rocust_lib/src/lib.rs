@@ -12,6 +12,7 @@ macro_rules! run {
         //TODO: decide the weight of each user type and spawn accordingly
         let mut spawn_users_handles_vec = Vec::new();
         $(
+            //TODO: how much to spawn und index interval as parameters
             let spawn_users_handles = $test.spawn_users::<$user_type>(results_tx.clone());
             spawn_users_handles_vec.push(spawn_users_handles);
         )*
