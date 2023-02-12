@@ -57,15 +57,46 @@ impl rocust_lib::traits::User for MyUser {
     }
 }
 
+#[rocust_macros::user]
+#[derive(Default, Clone)]
+pub struct MyUser2 {}
+
+#[rocust_macros::has_task(between = "(2, 10)", weight = 1)]
+impl MyUser2 {
+    #[task(priority = 1)]
+    pub async fn zoo(&mut self) {
+        println!("zoo");
+        rocust::rocust_lib::events::add_success(
+            self,
+            String::from("POST"),
+            String::from("/zoo"),
+            0.5,
+        );
+    }
+
+    #[task(priority = 1)]
+    pub async fn kaa(&mut self) {
+        println!("kaa");
+        rocust::rocust_lib::events::add_success(
+            self,
+            String::from("DELETE"),
+            String::from("/kaa"),
+            0.05,
+        );
+    }
+}
+
+impl rocust_lib::traits::User for MyUser2 {}
+
 #[tokio::main]
 async fn main() {
-    let test = rocust_lib::test::Test::new(20, 20, None);
+    let test = rocust_lib::test::Test::new(10, 10, None);
     let token = test.token.clone();
 
     tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(15)).await;
         token.cancel();
     });
 
-    test.run::<MyUser>().await;
+    rocust_lib::run!(test, MyUser, MyUser2);
 }

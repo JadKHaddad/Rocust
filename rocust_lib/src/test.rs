@@ -40,7 +40,7 @@ impl Test {
         tokio::time::sleep(Duration::from_secs(between)).await;
     }
 
-    fn spawn_users<T>(
+    pub fn spawn_users<T>(
         &self,
         results_tx: mpsc::UnboundedSender<ResultMessage>,
     ) -> JoinHandle<Vec<JoinHandle<()>>>
@@ -180,31 +180,45 @@ impl Test {
         }
     }
 
-    pub async fn run<T>(&self)
-    where
-        T: HasTask + User + Default + Send + 'static,
-    {
+    pub async fn before_spawn_users(
+        &self,
+    ) -> (
+        mpsc::UnboundedSender<ResultMessage>,
+        mpsc::UnboundedReceiver<ResultMessage>,
+    ) {
         //set timestamp
         *self.start_timestamp_arc_rwlock.write().await = Instant::now();
-        let (results_tx, results_rx) = mpsc::unbounded_channel();
+        mpsc::unbounded_channel()
+    }
 
-        let spawn_users_handles = self.spawn_users::<T>(results_tx);
+    pub async fn after_spawn_users(
+        &self,
+        results_tx: mpsc::UnboundedSender<ResultMessage>,
+        results_rx: mpsc::UnboundedReceiver<ResultMessage>,
+        spawn_users_handles_vec: Vec<JoinHandle<Vec<JoinHandle<()>>>>,
+    ) {
         //start a timer in another task
         let timer_handle = self.start_timer();
 
         //start the background tasks in another task (calculating stats, printing stats, managing files)
         let background_tasks_handle = self.start_background_tasks();
 
+        //drop the sender
+        drop(results_tx);
+
         //start the reciever
         self.block_on_reciever(results_rx).await;
         println!("reciever dropped");
 
         //wait for all users to finish
-        if let Ok(handles) = spawn_users_handles.await {
-            for handle in handles {
-                handle.await.unwrap();
+        for spawn_users_handles in spawn_users_handles_vec {
+            if let Ok(handles) = spawn_users_handles.await {
+                for handle in handles {
+                    handle.await.unwrap();
+                }
             }
         }
+
         println!("all users finished");
 
         background_tasks_handle.await.unwrap();
