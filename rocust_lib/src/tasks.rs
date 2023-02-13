@@ -1,18 +1,25 @@
 use std::future::Future;
 use std::pin::Pin;
 
+use crate::results::EventsHandler;
 use crate::traits::Prioritised;
 
 #[derive(Clone)]
-pub struct AsyncTask<T> {
+pub struct AsyncTask<T>
+where
+    T: 'static,
+{
     priority: u64,
-    func: fn(&mut T) -> Pin<Box<dyn Future<Output = ()> + Send + '_>>,
+    func: for<'a> fn(&'a mut T, &'a EventsHandler) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>>,
 }
 
 impl<T> AsyncTask<T> {
     pub fn new(
         priority: u64,
-        func: fn(&mut T) -> Pin<Box<dyn Future<Output = ()> + Send + '_>>,
+        func: for<'a> fn(
+            &'a mut T,
+            &'a EventsHandler,
+        ) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>>,
     ) -> Self {
         AsyncTask { priority, func }
     }
@@ -21,8 +28,8 @@ impl<T> AsyncTask<T> {
         self.priority
     }
 
-    pub async fn call(&self, user: &mut T) {
-        (self.func)(user).await;
+    pub async fn call(&self, user: &mut T, handler: &EventsHandler) {
+        (self.func)(user, handler).await;
     }
 }
 

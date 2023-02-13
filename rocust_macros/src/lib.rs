@@ -1,34 +1,7 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenTree;
 use quote::quote;
-use syn::{parse::Parser, parse_macro_input, AttributeArgs, DeriveInput};
-
-#[proc_macro_attribute]
-pub fn user(_attrs: TokenStream, item: TokenStream) -> TokenStream {
-    let mut derive_block = parse_macro_input!(item as DeriveInput);
-    match &mut derive_block.data {
-        syn::Data::Struct(ref mut struct_data) => {
-            match &mut struct_data.fields {
-                syn::Fields::Named(fields) => {
-                    fields.named.push(
-                        syn::Field::parse_named
-                            .parse2(
-                                quote! { pub results_sender: rocust_lib::results::ResultsSender },
-                            )
-                            .unwrap(),
-                    );
-                }
-                _ => (),
-            }
-
-            return quote! {
-                #derive_block
-            }
-            .into();
-        }
-        _ => panic!("`user` has to be used with structs "),
-    }
-}
+use syn::{parse_macro_input, AttributeArgs};
 
 #[proc_macro_attribute]
 pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
@@ -142,23 +115,22 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
 
     let methods = methods.iter().map(|(method_name, priority)| {
         quote! {
-            fn #method_name(u: &mut #struct_name) -> ::core::pin::Pin<Box<dyn ::core::future::Future<Output = ()> + ::core::marker::Send + '_>> {
+            fn #method_name<'a>(u: &'a mut #struct_name, handler: &'a rocust::rocust_lib::results::EventsHandler) -> ::core::pin::Pin<Box<dyn ::core::future::Future<Output = ()> + ::core::marker::Send + 'a>> {
                 Box::pin(async move {
-                    u.#method_name().await;
+                    u.#method_name(handler).await;
                 })
             }
-            async_tasks.push(rocust_lib::tasks::AsyncTask::new(#priority, #method_name));
+            async_tasks.push(rocust::rocust_lib::tasks::AsyncTask::new(#priority, #method_name));
         }
-
     });
 
     //now we can implement the function in the User trait that will inject the tasks in the user struct
     let expanded = quote! {
         #impl_block
 
-        impl rocust_lib::traits::HasTask for #struct_name {
-            fn get_async_tasks() -> Vec<rocust_lib::tasks::AsyncTask<Self>> where Self: Sized {
-                let mut async_tasks: Vec<rocust_lib::tasks::AsyncTask<Self>> = Vec::new();
+        impl rocust::rocust_lib::traits::HasTask for #struct_name {
+            fn get_async_tasks() -> Vec<rocust::rocust_lib::tasks::AsyncTask<Self>> where Self: Sized {
+                let mut async_tasks: Vec<rocust::rocust_lib::tasks::AsyncTask<Self>> = Vec::new();
                 #(#methods)*;
                 async_tasks
             }
@@ -169,14 +141,6 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
 
             fn get_weight() -> u64 {
                 #weight
-            }
-
-            fn get_results_sender(&self) -> &rocust_lib::results::ResultsSender{
-                &self.results_sender
-            }
-
-            fn set_sender(&mut self, sender: tokio::sync::mpsc::UnboundedSender<rocust_lib::results::ResultMessage>){
-                self.results_sender.set_sender(sender);
             }
         }
     };

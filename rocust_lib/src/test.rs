@@ -1,5 +1,5 @@
 use crate::{
-    results::{AllResults, ResultMessage},
+    results::{AllResults, EventsHandler, ResultMessage},
     traits::{HasTask, PrioritisedRandom, User},
 };
 use rand::Rng;
@@ -40,12 +40,9 @@ impl Test {
         tokio::time::sleep(Duration::from_secs(between)).await;
     }
 
-    pub fn spawn_users<T>(
-        &self,
-        results_tx: mpsc::UnboundedSender<ResultMessage>,
-    ) -> JoinHandle<Vec<JoinHandle<()>>>
+    pub fn spawn_users<T>(&self, event_handler: EventsHandler) -> JoinHandle<Vec<JoinHandle<()>>>
     where
-        T: HasTask + User + Default + Send + 'static,
+        T: HasTask + User + Send + 'static,
     {
         let tasks = Arc::new(T::get_async_tasks());
         if tasks.is_empty() {
@@ -55,19 +52,20 @@ impl Test {
         let users_per_second = self.users_per_second;
         let token = self.token.clone();
         let user_count = self.user_count;
+
         tokio::spawn(async move {
             let mut handles = vec![];
             let mut users_spawned = 0;
             for i in 0..user_count {
+                let event_handler = event_handler.clone();
                 let user_token = token.clone();
                 let spawn_token = user_token.clone();
                 let tasks = tasks.clone();
-                let results_tx_clone = results_tx.clone();
+
                 let handle = tokio::spawn(async move {
-                    let mut user = T::default();
-                    user.set_sender(results_tx_clone);
-                    user.on_create(i as u16);
-                    user.on_start();
+                    let mut user = T::new(&event_handler);
+                    user.on_create(i as u16, &event_handler);
+                    user.on_start(&event_handler);
                     loop {
                         // get a random task
                         if let Some(task) = tasks.get_proioritised_random() {
@@ -76,7 +74,7 @@ impl Test {
                                 // this is the sleep time of a user
                                 Test::sleep_between(between).await;
                                 // this is the actual task
-                                task.call(&mut user).await;
+                                task.call(&mut user, &event_handler).await;
                             };
                             // do some sleep or stop
                             tokio::select! {
@@ -88,7 +86,7 @@ impl Test {
                             }
                         }
                     }
-                    user.on_stop();
+                    user.on_stop(&event_handler);
                 });
                 handles.push(handle);
                 users_spawned += 1;
@@ -193,7 +191,7 @@ impl Test {
 
     pub async fn after_spawn_users(
         &self,
-        results_tx: mpsc::UnboundedSender<ResultMessage>,
+        events_handler: EventsHandler,
         results_rx: mpsc::UnboundedReceiver<ResultMessage>,
         spawn_users_handles_vec: Vec<JoinHandle<Vec<JoinHandle<()>>>>,
     ) {
@@ -203,8 +201,8 @@ impl Test {
         //start the background tasks in another task (calculating stats, printing stats, managing files)
         let background_tasks_handle = self.start_background_tasks();
 
-        //drop the sender
-        drop(results_tx);
+        //drop the events_handler to drop the sender sender
+        drop(events_handler);
 
         //start the reciever
         self.block_on_reciever(results_rx).await;

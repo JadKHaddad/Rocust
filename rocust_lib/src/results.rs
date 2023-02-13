@@ -1,6 +1,6 @@
 use prettytable::{row, Table};
 use std::{collections::HashMap, time::Duration};
-use tokio::sync::mpsc::{error::SendError, UnboundedSender};
+use tokio::sync::mpsc::UnboundedSender;
 
 #[derive(Debug, Default, Clone)]
 pub struct Results {
@@ -156,61 +156,38 @@ impl AllResults {
     }
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct ResultsSender {
-    pub sender: Option<UnboundedSender<ResultMessage>>,
+#[derive(Debug, Clone)]
+pub struct EventsHandler {
+    pub sender: UnboundedSender<ResultMessage>,
 }
 
-impl ResultsSender {
-    pub fn new(sender: Option<UnboundedSender<ResultMessage>>) -> Self {
+impl EventsHandler {
+    pub fn new(sender: UnboundedSender<ResultMessage>) -> Self {
         Self { sender }
     }
 
-    pub fn set_sender(&mut self, sender: UnboundedSender<ResultMessage>) {
-        self.sender = Some(sender);
-    }
-
-    pub fn add_success(
-        &self,
-        r#type: String,
-        name: String,
-        response_time: f64,
-    ) -> Result<(), SendError<ResultMessage>> {
-        if let Some(sender) = &self.sender {
-            return sender.send(ResultMessage::Success(SuccessResultMessage {
+    pub fn add_success(&self, r#type: String, name: String, response_time: f64) {
+        let _ = self
+            .sender
+            .send(ResultMessage::Success(SuccessResultMessage {
                 endpoint_type_name: EndpointTypeName(r#type, name),
                 response_time,
             }));
-        }
-        unreachable!();
     }
 
-    pub async fn add_failure(
-        &self,
-        r#type: String,
-        name: String,
-    ) -> Result<(), SendError<ResultMessage>> {
-        if let Some(sender) = &self.sender {
-            return sender.send(ResultMessage::Failure(FailureResultMessage {
+    pub fn add_failure(&self, r#type: String, name: String) {
+        let _ = self
+            .sender
+            .send(ResultMessage::Failure(FailureResultMessage {
                 endpoint_type_name: EndpointTypeName(r#type, name),
             }));
-        }
-        unreachable!();
     }
 
-    pub async fn add_error(
-        &self,
-        r#type: String,
-        name: String,
-        error: String,
-    ) -> Result<(), SendError<ResultMessage>> {
-        if let Some(sender) = &self.sender {
-            return sender.send(ResultMessage::Error(ErrorResultMessage {
-                endpoint_type_name: EndpointTypeName(r#type, name),
-                error,
-            }));
-        }
-        unreachable!();
+    pub fn add_error(&self, r#type: String, name: String, error: String) {
+        let _ = self.sender.send(ResultMessage::Error(ErrorResultMessage {
+            endpoint_type_name: EndpointTypeName(r#type, name),
+            error,
+        }));
     }
 }
 
