@@ -1,5 +1,9 @@
-use rocust::rocust_lib::traits::Shared;
-use rocust::rocust_lib::{results::EventsHandler, run, test::Test, traits::User};
+use rocust::rocust_lib::{
+    results::EventsHandler,
+    run,
+    test::Test,
+    traits::{Shared, User},
+};
 use rocust::rocust_macros::has_task;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -9,7 +13,7 @@ struct MyShared {
     pub some_shared: Arc<RwLock<i32>>,
 }
 
-impl rocust::rocust_lib::traits::Shared for MyShared {
+impl Shared for MyShared {
     fn new() -> Self {
         MyShared {
             some_shared: Arc::new(RwLock::new(0)),
@@ -62,7 +66,8 @@ impl MyUser {
 impl User for MyUser {
     type Shared = MyShared;
 
-    fn new(id: u16, handler: &EventsHandler, shared: MyShared) -> Self {
+    fn new(id: u16, handler: &EventsHandler, shared: Self::Shared) -> Self {
+        println!("MyUser Created!");
         handler.add_success(String::from("CREATE"), String::from(""), 0.0);
         MyUser {
             a: 0,
@@ -81,6 +86,20 @@ impl User for MyUser {
     }
 }
 
+struct MyUser2 {}
+
+#[has_task(between = "(3, 5)", weight = 4)]
+impl MyUser2 {}
+
+impl User for MyUser2 {
+    type Shared = MyShared;
+
+    fn new(_id: u16, _handler: &EventsHandler, _shared: Self::Shared) -> Self {
+        println!("MyUser2 Created!");
+        MyUser2 {}
+    }
+}
+
 #[tokio::main]
 async fn main() {
     let test = Test::new(10, 10, None);
@@ -91,5 +110,5 @@ async fn main() {
         token.cancel();
     });
 
-    run!(test, MyUser);
+    run!(test, MyUser, MyUser2);
 }

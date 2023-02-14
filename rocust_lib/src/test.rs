@@ -41,19 +41,24 @@ impl Test {
         tokio::time::sleep(Duration::from_secs(between)).await;
     }
 
-    pub fn spawn_users<T>(&self, event_handler: EventsHandler) -> JoinHandle<Vec<JoinHandle<()>>>
+    pub fn spawn_users<T, S>(
+        &self,
+        event_handler: EventsHandler,
+        shared: S,
+    ) -> JoinHandle<Vec<JoinHandle<()>>>
     where
-        T: HasTask + User + Send + 'static,
+        T: HasTask + User + User<Shared = S> + 'static,
+        S: Shared + 'static,
     {
         let tasks = Arc::new(T::get_async_tasks());
         if tasks.is_empty() {
             println!("Warning user has no tasks");
+            return tokio::spawn(async move { vec![] }); // just to avoid an infinite loop
         }
         let between = T::get_between();
         let users_per_second = self.users_per_second;
         let token = self.token.clone();
         let user_count = self.user_count;
-        let shared = T::Shared::new(); // TODO: this is a user specific shared object. Other user types should have their own shared object. so we need a global shared object
         tokio::spawn(async move {
             let mut handles = vec![];
             let mut users_spawned = 0;

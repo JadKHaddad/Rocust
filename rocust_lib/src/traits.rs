@@ -15,7 +15,7 @@ pub trait HasTask {
     }
 }
 
-pub trait User: Sized {
+pub trait User: Send + Sized {
     type Shared: Shared;
 
     fn new(_id: u16, _handler: &EventsHandler, _shared: Self::Shared) -> Self; // TODO: pass test config and a test controller to be able to stop the test based on some user defined conditions
@@ -54,4 +54,8 @@ where
         }
         None
     }
+}
+
+impl Shared for () {
+    fn new() -> Self {}
 }
