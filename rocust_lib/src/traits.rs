@@ -16,10 +16,9 @@ pub trait HasTask {
 }
 
 pub trait User {
-    fn new(_handler: &EventsHandler) -> Self
+    fn new(_id: u16, _handler: &EventsHandler) -> Self
     where
         Self: Sized;
-    fn on_create(&mut self, _id: u16, _handler: &EventsHandler) {}
     fn on_start(&mut self, _handler: &EventsHandler) {}
     fn on_stop(&mut self, _handler: &EventsHandler) {}
 }

@@ -63,8 +63,7 @@ impl Test {
                 let tasks = tasks.clone();
 
                 let handle = tokio::spawn(async move {
-                    let mut user = T::new(&event_handler);
-                    user.on_create(i as u16, &event_handler);
+                    let mut user = T::new(i as u16, &event_handler);
                     user.on_start(&event_handler);
                     loop {
                         // get a random task

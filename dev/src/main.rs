@@ -1,7 +1,7 @@
 use rocust::rocust_lib::{results::EventsHandler, run, test::Test, traits::User};
 use rocust::rocust_macros::has_task;
 
-pub struct MyUser {
+struct MyUser {
     a: i32,
     b: i32,
     id: u16,
@@ -35,17 +35,12 @@ impl MyUser {
 }
 
 impl User for MyUser {
-    fn new(handler: &EventsHandler) -> Self
+    fn new(id: u16, handler: &EventsHandler) -> Self
     where
         Self: Sized,
     {
         handler.add_success(String::from("CREATE"), String::from(""), 0.0);
-        MyUser { a: 0, b: 0, id: 0 }
-    }
-
-    fn on_create(&mut self, id: u16, _: &EventsHandler) {
-        self.id = id;
-        println!("on_create: {}", id);
+        MyUser { a: 0, b: 0, id }
     }
 
     fn on_start(&mut self, _: &EventsHandler) {
