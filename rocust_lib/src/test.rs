@@ -213,6 +213,9 @@ impl Test {
         self.block_on_reciever(results_rx).await;
         println!("reciever dropped");
 
+        // this will cancel the timer and background tasks if the only given user has no tasks so it will finish immediately thus causing the reciever to drop
+        self.token.cancel();
+
         //wait for all users to finish
         for spawn_users_handles in spawn_users_handles_vec {
             if let Ok(handles) = spawn_users_handles.await {

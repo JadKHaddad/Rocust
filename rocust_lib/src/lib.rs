@@ -25,7 +25,6 @@ macro_rules! run {
             spawn_users_handles_vec.push(spawn_users_handles);
         )*
 
-        println!("Waiting for users to finish");
         $test.after_spawn_users(events_handler, results_rx, spawn_users_handles_vec)
             .await;
     };
