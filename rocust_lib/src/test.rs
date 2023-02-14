@@ -1,3 +1,4 @@
+use crate::traits::Shared;
 use crate::{
     results::{AllResults, EventsHandler, ResultMessage},
     traits::{HasTask, PrioritisedRandom, User},
@@ -52,7 +53,7 @@ impl Test {
         let users_per_second = self.users_per_second;
         let token = self.token.clone();
         let user_count = self.user_count;
-
+        let shared = T::Shared::new(); // TODO: this is a user specific shared object. Other user types should have their own shared object. so we need a global shared object
         tokio::spawn(async move {
             let mut handles = vec![];
             let mut users_spawned = 0;
@@ -61,9 +62,9 @@ impl Test {
                 let user_token = token.clone();
                 let spawn_token = user_token.clone();
                 let tasks = tasks.clone();
-
+                let shared = shared.clone();
                 let handle = tokio::spawn(async move {
-                    let mut user = T::new(i as u16, &event_handler);
+                    let mut user = T::new(i as u16, &event_handler, shared);
                     user.on_start(&event_handler);
                     loop {
                         // get a random task

@@ -15,12 +15,16 @@ pub trait HasTask {
     }
 }
 
-pub trait User {
-    fn new(_id: u16, _handler: &EventsHandler) -> Self
-    where
-        Self: Sized;
+pub trait User: Sized {
+    type Shared: Shared;
+
+    fn new(_id: u16, _handler: &EventsHandler, _shared: Self::Shared) -> Self; // TODO: pass test config and a test controller to be able to stop the test based on some user defined conditions
     fn on_start(&mut self, _handler: &EventsHandler) {}
     fn on_stop(&mut self, _handler: &EventsHandler) {}
+}
+
+pub trait Shared: Clone + Send {
+    fn new() -> Self;
 }
 
 pub trait Prioritised {

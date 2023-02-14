@@ -1,10 +1,27 @@
+use rocust::rocust_lib::traits::Shared;
 use rocust::rocust_lib::{results::EventsHandler, run, test::Test, traits::User};
 use rocust::rocust_macros::has_task;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+
+#[derive(Clone)]
+struct MyShared {
+    pub some_shared: Arc<RwLock<i32>>,
+}
+
+impl rocust::rocust_lib::traits::Shared for MyShared {
+    fn new() -> Self {
+        MyShared {
+            some_shared: Arc::new(RwLock::new(0)),
+        }
+    }
+}
 
 struct MyUser {
     a: i32,
     b: i32,
     id: u16,
+    shared: MyShared,
 }
 
 #[has_task(between = "(3, 5)", weight = 4)]
@@ -21,6 +38,10 @@ impl MyUser {
         self.b += 1;
         println!("{} bar: {}", self.id, self.b);
         handler.add_failure(String::from("GET"), String::from("/bar"));
+
+        // count failures in shared state
+        let mut shared = self.shared.some_shared.write().await;
+        *shared += 1;
     }
 
     #[task(priority = 2)]
@@ -31,16 +52,24 @@ impl MyUser {
             String::from("/baz"),
             String::from("error"),
         );
+
+        // print shared state maybe?
+        let shared = self.shared.some_shared.read().await;
+        println!("shared: {}", *shared);
     }
 }
 
 impl User for MyUser {
-    fn new(id: u16, handler: &EventsHandler) -> Self
-    where
-        Self: Sized,
-    {
+    type Shared = MyShared;
+
+    fn new(id: u16, handler: &EventsHandler, shared: MyShared) -> Self {
         handler.add_success(String::from("CREATE"), String::from(""), 0.0);
-        MyUser { a: 0, b: 0, id }
+        MyUser {
+            a: 0,
+            b: 0,
+            id,
+            shared,
+        }
     }
 
     fn on_start(&mut self, _: &EventsHandler) {

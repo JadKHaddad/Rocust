@@ -5,7 +5,7 @@ pub mod traits;
 
 #[macro_export]
 macro_rules! run {
-    ($test:ident, $($user_type:ty),+) => {
+    ($test:ident,$($user_type:ty),+) => {
         let (results_tx, results_rx) = $test.before_spawn_users().await;
         let events_handler = EventsHandler::new(results_tx);
 
@@ -13,7 +13,8 @@ macro_rules! run {
         let mut spawn_users_handles_vec = Vec::new();
         $(
             //TODO: how much to spawn and index interval as parameters
-            let spawn_users_handles = $test.spawn_users::<$user_type>(events_handler.clone());
+            let spawn_users_handles = $test.spawn_users::<$user_type>(events_handler.clone()
+        );
             spawn_users_handles_vec.push(spawn_users_handles);
         )*
 
