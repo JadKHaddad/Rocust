@@ -219,8 +219,18 @@ impl Test {
         //wait for all users to finish
         for spawn_users_handles in spawn_users_handles_vec {
             if let Ok(handles) = spawn_users_handles.await {
-                for handle in handles {
-                    handle.await.unwrap();
+                for (id, handle) in handles.into_iter().enumerate() {
+                    match handle.await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            if e.is_cancelled() {
+                                println!("Error: user {} was cancelled", id);
+                            }
+                            if e.is_panic() {
+                                println!("Error: user {} panicked", id);
+                            }
+                        }
+                    }
                 }
             }
         }

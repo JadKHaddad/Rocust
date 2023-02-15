@@ -61,6 +61,11 @@ impl MyUser {
         let shared = self.shared.some_shared.read().await;
         println!("shared: {}", *shared);
     }
+
+    #[task(priority = 4)]
+    pub async fn panic(&mut self, _handler: &EventsHandler) {
+        panic!("panic");
+    }
 }
 
 impl User for MyUser {
@@ -106,9 +111,9 @@ async fn main() {
     let token = test.token.clone();
 
     tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
         token.cancel();
     });
 
-    run!(test, MyUser, MyUser2);
+    run!(test, MyUser);
 }
