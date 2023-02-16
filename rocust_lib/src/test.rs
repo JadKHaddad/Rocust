@@ -172,11 +172,11 @@ impl Test {
                     tokio::select! {
                         // this could be ctrl+c or any other signal
                         _ = token.cancelled() => {
-                            println!("received signal");
+                            tracing::info!("Received signal");
                         }
                         // this is the run time
                         _ = tokio::time::sleep(std::time::Duration::from_secs(runtime)) => {
-                            println!("timer finished");
+                            tracing::debug!("Timer finished");
                             token.cancel();
                         }
                     }
@@ -187,6 +187,7 @@ impl Test {
                 tokio::spawn(async move {
                     // this could be ctrl+c or any other signal
                     token.cancelled().await;
+                    tracing::info!("Received signal");
                 })
             }
         }
