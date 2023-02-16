@@ -96,7 +96,7 @@ struct MyUser2 {
     id: u64,
 }
 
-#[has_task(between = "(3, 5)", weight = 3)]
+#[has_task(between = "(3, 5)", weight = 3, name = "FooFooUser")]
 impl MyUser2 {
     #[task(priority = 5)]
     pub async fn foo(&mut self, handler: &EventsHandler) {
@@ -121,7 +121,7 @@ struct MyUser3 {
     id: u64,
 }
 
-#[has_task(between = "(3, 5)", weight = 3)]
+#[has_task(between = "(3, 5)", weight = 3, name = "CargoUser")]
 impl MyUser3 {
     #[task(priority = 5)]
     pub async fn foo(&mut self, handler: &EventsHandler) {
@@ -144,20 +144,19 @@ impl User for MyUser3 {
 
 #[tokio::main]
 async fn main() {
-    let subscriber = tracing_subscriber::fmt()
-        // Use a more compact, abbreviated log format
-        .compact()
-        // Build the subscriber
-        .finish();
+    // export RUSTFLAGS="--cfg tokio_unstable"
+    // $Env:RUSTFLAGS="--cfg tokio_unstable"
+    // console_subscriber::init();
 
+    let subscriber = tracing_subscriber::fmt().compact().finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    let test_config = TestConfig::new(10, 10, None);
+    let test_config = TestConfig::new(50, 2, None);
     let test = Test::new(test_config);
     let test_controller = test.get_controller();
 
     tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
         test_controller.stop();
     });
 
