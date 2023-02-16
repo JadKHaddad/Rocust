@@ -1,6 +1,9 @@
 use prettytable::{row, Table};
 use std::{collections::HashMap, time::Duration};
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::{
+    io::{self, AsyncWriteExt},
+    sync::mpsc::UnboundedSender,
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct Results {
@@ -109,7 +112,7 @@ impl AllResults {
         }
     }
 
-    pub fn print_table(&self) {
+    pub async fn print_table(&self) {
         let mut table = Table::new();
         table.add_row(row![
             "TYPE",
@@ -152,7 +155,8 @@ impl AllResults {
             self.aggrigated_results.min_response_time,
             self.aggrigated_results.max_response_time,
         ]);
-        table.printstd();
+        let mut stdout = io::stdout();
+        let _ = stdout.write_all(table.to_string().as_bytes()).await;
     }
 
     pub fn get_by_type(&self, r#type: &str) -> Vec<&Results> {

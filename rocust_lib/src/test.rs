@@ -45,6 +45,7 @@ impl TestController {
     }
 
     pub fn stop(&self) {
+        tracing::info!("Stopping test");
         self.token.cancel();
     }
 
@@ -100,7 +101,7 @@ impl Test {
     {
         let tasks = Arc::new(T::get_async_tasks());
         if tasks.is_empty() {
-            println!("Warning user {} has no tasks", T::get_name());
+            tracing::warn!("User [{}] has no tasks", T::get_name());
             return tokio::spawn(async move { vec![] }); // just to avoid an infinite loop
         }
         let between = T::get_between();
@@ -166,7 +167,7 @@ impl Test {
         let token = self.token.clone();
         match self.test_config.runtime {
             Some(runtime) => {
-                println!("runtime: {}s", runtime);
+                tracing::info!("Runtime: {}s", runtime);
                 tokio::spawn(async move {
                     tokio::select! {
                         // this could be ctrl+c or any other signal
@@ -182,7 +183,7 @@ impl Test {
                 })
             }
             None => {
-                println!("runtime: infinite");
+                tracing::info!("Runtime: infinite");
                 tokio::spawn(async move {
                     // this could be ctrl+c or any other signal
                     token.cancelled().await;
@@ -207,7 +208,7 @@ impl Test {
                         let elapsed_time = Test::calculate_elapsed_time(&*start_timestamp_arc_rwlock.read().await);
                         all_results_gaurd.calculate_per_second(&elapsed_time);
                         // print stats
-                        all_results_gaurd.print_table();
+                        all_results_gaurd.print_table().await;
                     }
                 }
             }
@@ -263,7 +264,7 @@ impl Test {
 
         // start the reciever
         self.block_on_reciever(results_rx).await;
-        println!("reciever dropped");
+        tracing::debug!("Reciever dropped");
 
         // this will cancel the timer and background tasks if the only given user has no tasks so it will finish immediately thus causing the reciever to drop
         self.token.cancel();
@@ -274,23 +275,27 @@ impl Test {
                 for (handle, user_panic_info) in handles {
                     match handle.await {
                         Ok(user_info) => {
-                            println!(
-                                "user {} {} finished with {} tasks",
-                                user_info.name, user_info.id, user_info.total_tasks
-                            );
+                            tracing::info!(
+                                "User [{}][{}] finished with [{}] tasks",
+                                user_info.name,
+                                user_info.id,
+                                user_info.total_tasks
+                            )
                         }
                         Err(e) => {
                             if e.is_cancelled() {
-                                println!(
-                                    "Error: user {} {} was cancelled",
-                                    user_panic_info.name, user_panic_info.id
-                                );
+                                tracing::warn!(
+                                    "User [{}][{}] was cancelled",
+                                    user_panic_info.name,
+                                    user_panic_info.id
+                                )
                             }
                             if e.is_panic() {
-                                println!(
-                                    "Error: user {} {} panicked",
-                                    user_panic_info.name, user_panic_info.id
-                                );
+                                tracing::error!(
+                                    "User [{}][{}] panicked",
+                                    user_panic_info.name,
+                                    user_panic_info.id
+                                )
                             }
                         }
                     }
@@ -298,14 +303,12 @@ impl Test {
             }
         }
 
-        println!("all users finished");
-
         background_tasks_handle.await.unwrap();
-        println!("background tasks finished");
+        tracing::debug!("Background tasks finished");
 
         timer_handle.await.unwrap();
-        println!("timer finished");
+        tracing::debug!("Timer finished");
 
-        println!("terminating");
+        tracing::info!("Test finished");
     }
 }

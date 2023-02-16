@@ -4,6 +4,7 @@ use rocust::rocust_lib::{
     test::{Test, TestConfig},
     traits::{Shared, User},
 };
+
 use rocust::rocust_macros::has_task;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -143,6 +144,14 @@ impl User for MyUser3 {
 
 #[tokio::main]
 async fn main() {
+    let subscriber = tracing_subscriber::fmt()
+        // Use a more compact, abbreviated log format
+        .compact()
+        // Build the subscriber
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+
     let test_config = TestConfig::new(10, 10, None);
     let test = Test::new(test_config);
     let test_controller = test.get_controller();
