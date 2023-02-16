@@ -6,6 +6,10 @@ pub trait HasTask {
         vec![]
     }
 
+    fn get_name() -> String {
+        String::from("unnamed")
+    }
+
     fn get_between() -> (u64, u64) {
         (0, 0)
     }

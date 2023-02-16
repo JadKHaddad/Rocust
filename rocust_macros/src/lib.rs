@@ -11,6 +11,7 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
     let mut min = 0;
     let mut max = 0;
     let mut weight = 1;
+    let mut name = String::from("unnamed");
     for attr in attrs {
         if let syn::NestedMeta::Meta(syn::Meta::NameValue(name_value)) = attr {
             if name_value.path.get_ident().unwrap().to_string() == "between" {
@@ -39,8 +40,14 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
                 } else {
                     panic!("weight has to be a number");
                 }
+            } else if name_value.path.get_ident().unwrap().to_string() == "name" {
+                if let syn::Lit::Str(lit_str) = name_value.lit {
+                    name = lit_str.value();
+                } else {
+                    panic!("name has to be a string");
+                }
             } else {
-                panic!("Only between and weight is supported");
+                panic!("Only name, between and weight is supported");
             }
         } else {
             panic!("Only Meta is supported");
@@ -49,6 +56,7 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
     let min = syn::LitInt::new(&min.to_string(), proc_macro2::Span::call_site());
     let max = syn::LitInt::new(&max.to_string(), proc_macro2::Span::call_site());
     let weight = syn::LitInt::new(&weight.to_string(), proc_macro2::Span::call_site());
+    let name = syn::LitStr::new(&name, proc_macro2::Span::call_site());
 
     let struct_name = if let syn::Type::Path(type_path) = &impl_block.self_ty.as_ref() {
         if let Some(ident) = type_path.path.get_ident() {
@@ -133,6 +141,10 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
                 let mut async_tasks: Vec<rocust::rocust_lib::tasks::AsyncTask<Self>> = Vec::new();
                 #(#methods)*;
                 async_tasks
+            }
+
+            fn get_name() -> String {
+                String::from(#name)
             }
 
             fn get_between() -> (u64, u64) {

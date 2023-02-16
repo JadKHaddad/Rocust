@@ -28,7 +28,7 @@ struct MyUser {
     shared: MyShared,
 }
 
-#[has_task(between = "(3, 5)", weight = 4)]
+#[has_task(between = "(3, 5)", weight = 4, name = "RoCustUnstableUser")]
 impl MyUser {
     #[task(priority = 5)]
     pub async fn foo(&mut self, handler: &EventsHandler) {

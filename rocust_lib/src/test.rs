@@ -1,7 +1,7 @@
-use crate::traits::Shared;
 use crate::{
     results::{AllResults, EventsHandler, ResultMessage},
-    traits::{HasTask, PrioritisedRandom, User},
+    traits::{HasTask, PrioritisedRandom, Shared, User},
+    user::{UserInfo, UserPanicInfo},
 };
 use rand::Rng;
 use std::{sync::Arc, time::Duration};
@@ -47,7 +47,7 @@ impl Test {
         starting_index: u64,
         event_handler: EventsHandler,
         shared: S,
-    ) -> JoinHandle<Vec<(JoinHandle<()>, u64)>>
+    ) -> JoinHandle<Vec<(JoinHandle<UserInfo>, UserPanicInfo)>>
     where
         T: HasTask + User + User<Shared = S> + 'static,
         S: Shared + 'static,
@@ -73,6 +73,7 @@ impl Test {
                 let shared = shared.clone();
                 let handle = tokio::spawn(async move {
                     let mut user = T::new(id, &event_handler, shared);
+                    let mut total_tasks: u64 = 0;
                     user.on_start(&event_handler);
                     loop {
                         // get a random task
@@ -83,6 +84,7 @@ impl Test {
                                 Test::sleep_between(between).await;
                                 // this is the actual task
                                 task.call(&mut user, &event_handler).await;
+                                total_tasks += 1;
                             };
                             // do some sleep or stop
                             tokio::select! {
@@ -95,8 +97,9 @@ impl Test {
                         }
                     }
                     user.on_stop(&event_handler);
+                    UserInfo::new(id, T::get_name(), total_tasks)
                 });
-                handles.push((handle, id));
+                handles.push((handle, UserPanicInfo::new(id, T::get_name())));
                 users_spawned += 1;
                 if users_spawned % users_per_second == 0 {
                     tokio::select! {
@@ -201,7 +204,7 @@ impl Test {
         &self,
         events_handler: EventsHandler,
         results_rx: mpsc::UnboundedReceiver<ResultMessage>,
-        spawn_users_handles_vec: Vec<JoinHandle<Vec<(JoinHandle<()>, u64)>>>,
+        spawn_users_handles_vec: Vec<JoinHandle<Vec<(JoinHandle<UserInfo>, UserPanicInfo)>>>,
     ) {
         //start a timer in another task
         let timer_handle = self.start_timer();
@@ -222,15 +225,26 @@ impl Test {
         //wait for all users to finish
         for spawn_users_handles in spawn_users_handles_vec {
             if let Ok(handles) = spawn_users_handles.await {
-                for (handle, id) in handles {
+                for (handle, user_panic_info) in handles {
                     match handle.await {
-                        Ok(_) => {}
+                        Ok(user_info) => {
+                            println!(
+                                "user {} {} finished with {} tasks",
+                                user_info.name, user_info.id, user_info.total_tasks
+                            );
+                        }
                         Err(e) => {
                             if e.is_cancelled() {
-                                println!("Error: user {} was cancelled", id);
+                                println!(
+                                    "Error: user {} {} was cancelled",
+                                    user_panic_info.name, user_panic_info.id
+                                );
                             }
                             if e.is_panic() {
-                                println!("Error: user {} panicked", id);
+                                println!(
+                                    "Error: user {} {} panicked",
+                                    user_panic_info.name, user_panic_info.id
+                                );
                             }
                         }
                     }
