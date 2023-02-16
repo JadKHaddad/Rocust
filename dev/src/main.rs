@@ -24,20 +24,20 @@ impl Shared for MyShared {
 struct MyUser {
     a: i32,
     b: i32,
-    id: u16,
+    id: u64,
     shared: MyShared,
 }
 
 #[has_task(between = "(3, 5)", weight = 4)]
 impl MyUser {
-    #[task(priority = 1)]
+    #[task(priority = 5)]
     pub async fn foo(&mut self, handler: &EventsHandler) {
         self.a += 1;
         println!("{}: foo: {}", self.id, self.a);
         handler.add_success(String::from("GET"), String::from("/foo"), 0.1);
     }
 
-    #[task(priority = 3)]
+    #[task(priority = 6)]
     pub async fn bar(&mut self, handler: &EventsHandler) {
         self.b += 1;
         println!("{} bar: {}", self.id, self.b);
@@ -48,7 +48,7 @@ impl MyUser {
         *shared += 1;
     }
 
-    #[task(priority = 2)]
+    #[task(priority = 9)]
     pub async fn baz(&mut self, handler: &EventsHandler) {
         println!("{} baz: {}", self.id, self.a + self.b);
         handler.add_error(
@@ -62,7 +62,7 @@ impl MyUser {
         println!("shared: {}", *shared);
     }
 
-    #[task(priority = 4)]
+    #[task(priority = 1)]
     pub async fn panic(&mut self, _handler: &EventsHandler) {
         panic!("panic");
     }
@@ -71,7 +71,7 @@ impl MyUser {
 impl User for MyUser {
     type Shared = MyShared;
 
-    fn new(id: u16, handler: &EventsHandler, shared: Self::Shared) -> Self {
+    fn new(id: u64, handler: &EventsHandler, shared: Self::Shared) -> Self {
         println!("MyUser Created!");
         handler.add_success(String::from("CREATE"), String::from(""), 0.0);
         MyUser {
@@ -91,17 +91,53 @@ impl User for MyUser {
     }
 }
 
-struct MyUser2 {}
+struct MyUser2 {
+    id: u64,
+}
 
-#[has_task(between = "(3, 5)", weight = 4)]
-impl MyUser2 {}
+#[has_task(between = "(3, 5)", weight = 3)]
+impl MyUser2 {
+    #[task(priority = 5)]
+    pub async fn foo(&mut self, handler: &EventsHandler) {
+        handler.add_success(String::from("GET"), String::from("/foo/2"), 0.1);
+    }
+}
 
 impl User for MyUser2 {
     type Shared = MyShared;
 
-    fn new(_id: u16, _handler: &EventsHandler, _shared: Self::Shared) -> Self {
+    fn new(id: u64, _handler: &EventsHandler, _shared: Self::Shared) -> Self {
         println!("MyUser2 Created!");
-        MyUser2 {}
+        MyUser2 { id }
+    }
+
+    fn on_stop(&mut self, _: &EventsHandler) {
+        println!("on_stop: {}", self.id);
+    }
+}
+
+struct MyUser3 {
+    id: u64,
+}
+
+#[has_task(between = "(3, 5)", weight = 3)]
+impl MyUser3 {
+    #[task(priority = 5)]
+    pub async fn foo(&mut self, handler: &EventsHandler) {
+        handler.add_success(String::from("GET"), String::from("/foo/3"), 0.1);
+    }
+}
+
+impl User for MyUser3 {
+    type Shared = MyShared;
+
+    fn new(id: u64, _handler: &EventsHandler, _shared: Self::Shared) -> Self {
+        println!("MyUser3 Created!");
+        MyUser3 { id }
+    }
+
+    fn on_stop(&mut self, _: &EventsHandler) {
+        println!("on_stop: {}", self.id);
     }
 }
 
@@ -115,5 +151,5 @@ async fn main() {
         token.cancel();
     });
 
-    run!(test, MyUser);
+    run!(test, MyUser, MyUser2, MyUser3);
 }

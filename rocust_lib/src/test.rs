@@ -43,9 +43,11 @@ impl Test {
 
     pub fn spawn_users<T, S>(
         &self,
+        count: u64,
+        starting_index: u64,
         event_handler: EventsHandler,
         shared: S,
-    ) -> JoinHandle<Vec<JoinHandle<()>>>
+    ) -> JoinHandle<Vec<(JoinHandle<()>, u64)>>
     where
         T: HasTask + User + User<Shared = S> + 'static,
         S: Shared + 'static,
@@ -58,18 +60,19 @@ impl Test {
         let between = T::get_between();
         let users_per_second = self.users_per_second;
         let token = self.token.clone();
-        let user_count = self.user_count;
+        let user_count = count;
         tokio::spawn(async move {
             let mut handles = vec![];
             let mut users_spawned = 0;
             for i in 0..user_count {
+                let id = i as u64 + starting_index;
                 let event_handler = event_handler.clone();
                 let user_token = token.clone();
                 let spawn_token = user_token.clone();
                 let tasks = tasks.clone();
                 let shared = shared.clone();
                 let handle = tokio::spawn(async move {
-                    let mut user = T::new(i as u16, &event_handler, shared);
+                    let mut user = T::new(id, &event_handler, shared);
                     user.on_start(&event_handler);
                     loop {
                         // get a random task
@@ -93,7 +96,7 @@ impl Test {
                     }
                     user.on_stop(&event_handler);
                 });
-                handles.push(handle);
+                handles.push((handle, id));
                 users_spawned += 1;
                 if users_spawned % users_per_second == 0 {
                     tokio::select! {
@@ -198,7 +201,7 @@ impl Test {
         &self,
         events_handler: EventsHandler,
         results_rx: mpsc::UnboundedReceiver<ResultMessage>,
-        spawn_users_handles_vec: Vec<JoinHandle<Vec<JoinHandle<()>>>>,
+        spawn_users_handles_vec: Vec<JoinHandle<Vec<(JoinHandle<()>, u64)>>>,
     ) {
         //start a timer in another task
         let timer_handle = self.start_timer();
@@ -219,7 +222,7 @@ impl Test {
         //wait for all users to finish
         for spawn_users_handles in spawn_users_handles_vec {
             if let Ok(handles) = spawn_users_handles.await {
-                for (id, handle) in handles.into_iter().enumerate() {
+                for (handle, id) in handles {
                     match handle.await {
                         Ok(_) => {}
                         Err(e) => {
