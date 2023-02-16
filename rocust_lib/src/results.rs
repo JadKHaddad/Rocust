@@ -17,7 +17,7 @@ pub struct Results {
 }
 
 impl Results {
-    pub fn add_success(&mut self, response_time: f64) {
+    fn add_success(&mut self, response_time: f64) {
         self.total_response_time += response_time;
         self.total_requests += 1;
         self.average_response_time = self.total_response_time / self.total_requests as f64;
@@ -29,12 +29,12 @@ impl Results {
         }
     }
 
-    pub fn add_failure(&mut self) {
+    fn add_failure(&mut self) {
         self.total_requests += 1;
         self.total_failed_requests += 1;
     }
 
-    pub fn add_error(&mut self) {
+    fn add_error(&mut self) {
         self.total_errors += 1;
     }
 
@@ -50,7 +50,7 @@ impl Results {
         self.failed_requests_per_second = failed_requests_per_second;
     }
 
-    pub fn calculate_per_second(&mut self, elapsed: &Duration) {
+    fn calculate_per_second(&mut self, elapsed: &Duration) {
         self.calculate_requests_per_second(elapsed);
         self.calculate_failed_requests_per_second(elapsed);
     }
@@ -61,8 +61,8 @@ pub struct EndpointTypeName(pub String, pub String);
 
 #[derive(Debug, Default, Clone)]
 pub struct AllResults {
-    pub aggrigated_results: Results,
-    pub endpoint_results: HashMap<EndpointTypeName, Results>,
+    aggrigated_results: Results,
+    endpoint_results: HashMap<EndpointTypeName, Results>,
 }
 
 impl AllResults {
@@ -154,11 +154,40 @@ impl AllResults {
         ]);
         table.printstd();
     }
+
+    pub fn get_by_type(&self, r#type: &str) -> Vec<&Results> {
+        let mut results = Vec::new();
+        for (endpoint_type_name, result) in &self.endpoint_results {
+            if endpoint_type_name.0 == r#type {
+                results.push(result);
+            }
+        }
+        results
+    }
+
+    pub fn get_by_name(&self, name: &str) -> Vec<&Results> {
+        let mut results = Vec::new();
+        for (endpoint_type_name, result) in &self.endpoint_results {
+            if endpoint_type_name.1 == name {
+                results.push(result);
+            }
+        }
+        results
+    }
+
+    pub fn get_by_type_and_name(&self, r#type: &str, name: &str) -> Option<&Results> {
+        self.endpoint_results
+            .get(&EndpointTypeName(r#type.to_string(), name.to_string()))
+    }
+
+    pub fn get_aggrigated(&self) -> &Results {
+        &self.aggrigated_results
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct EventsHandler {
-    pub sender: UnboundedSender<ResultMessage>,
+    sender: UnboundedSender<ResultMessage>,
 }
 
 impl EventsHandler {

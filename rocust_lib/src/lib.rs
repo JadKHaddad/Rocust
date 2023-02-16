@@ -21,7 +21,7 @@ macro_rules! run {
         )*
         let total_given_users_count = weights.len();
         let full_weight = weights.iter().map(|(_, weight)| weight).sum::<u64>();
-        let counts = weights.iter().map(|(name, weight)| (name, $test.user_count * weight/full_weight)).collect::<std::collections::HashMap<_,_>>();
+        let counts = weights.iter().map(|(name, weight)| (name, $test.get_config().user_count * weight/full_weight)).collect::<std::collections::HashMap<_,_>>();
 
         let mut spawn_users_handles_vec = Vec::new();
 

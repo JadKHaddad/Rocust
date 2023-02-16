@@ -56,7 +56,7 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
     let min = syn::LitInt::new(&min.to_string(), proc_macro2::Span::call_site());
     let max = syn::LitInt::new(&max.to_string(), proc_macro2::Span::call_site());
     let weight = syn::LitInt::new(&weight.to_string(), proc_macro2::Span::call_site());
-    let name = syn::LitStr::new(&name, proc_macro2::Span::call_site());
+    let name = syn::LitStr::new(&name.to_string(), proc_macro2::Span::call_site());
 
     let struct_name = if let syn::Type::Path(type_path) = &impl_block.self_ty.as_ref() {
         if let Some(ident) = type_path.path.get_ident() {

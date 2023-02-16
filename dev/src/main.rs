@@ -1,7 +1,7 @@
 use rocust::rocust_lib::{
     results::EventsHandler,
     run,
-    test::Test,
+    test::{Test, TestConfig},
     traits::{Shared, User},
 };
 use rocust::rocust_macros::has_task;
@@ -143,12 +143,13 @@ impl User for MyUser3 {
 
 #[tokio::main]
 async fn main() {
-    let test = Test::new(10, 10, None);
-    let token = test.token.clone();
+    let test_config = TestConfig::new(10, 10, None);
+    let test = Test::new(test_config);
+    let test_controller = test.get_controller();
 
     tokio::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-        token.cancel();
+        test_controller.stop();
     });
 
     run!(test, MyUser, MyUser2, MyUser3);

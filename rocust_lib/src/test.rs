@@ -11,25 +11,71 @@ use tokio::{
     time::Instant,
 };
 use tokio_util::sync::CancellationToken;
-pub struct Test {
+
+pub struct TestConfig {
     pub user_count: u64,
     pub users_per_second: u64,
     pub runtime: Option<u64>,
-    pub token: Arc<CancellationToken>,
-    pub all_results_arc_rwlock: Arc<RwLock<AllResults>>,
-    pub start_timestamp_arc_rwlock: Arc<RwLock<Instant>>,
 }
 
-impl Test {
+impl TestConfig {
     pub fn new(user_count: u64, users_per_second: u64, runtime: Option<u64>) -> Self {
-        Test {
+        TestConfig {
             user_count,
             users_per_second,
             runtime,
+        }
+    }
+}
+
+pub struct TestController {
+    token: Arc<CancellationToken>,
+    all_results_arc_rwlock: Arc<RwLock<AllResults>>,
+}
+
+impl TestController {
+    pub fn new(
+        token: Arc<CancellationToken>,
+        all_results_arc_rwlock: Arc<RwLock<AllResults>>,
+    ) -> Self {
+        TestController {
+            token,
+            all_results_arc_rwlock,
+        }
+    }
+
+    pub fn stop(&self) {
+        self.token.cancel();
+    }
+
+    pub async fn get_results(&self) -> AllResults {
+        self.all_results_arc_rwlock.read().await.clone()
+    }
+}
+
+pub struct Test {
+    test_config: TestConfig,
+    token: Arc<CancellationToken>,
+    all_results_arc_rwlock: Arc<RwLock<AllResults>>,
+    start_timestamp_arc_rwlock: Arc<RwLock<Instant>>,
+}
+
+impl Test {
+    pub fn new(test_config: TestConfig) -> Self {
+        Test {
+            test_config,
             token: Arc::new(CancellationToken::new()),
             all_results_arc_rwlock: Arc::new(RwLock::new(AllResults::default())),
             start_timestamp_arc_rwlock: Arc::new(RwLock::new(Instant::now())),
         }
+    }
+
+    pub fn get_controller(&self) -> TestController {
+        TestController::new(self.token.clone(), self.all_results_arc_rwlock.clone())
+    }
+
+    pub fn get_config(&self) -> &TestConfig {
+        &self.test_config
     }
 
     fn calculate_elapsed_time(start_timestamp: &Instant) -> Duration {
@@ -54,11 +100,11 @@ impl Test {
     {
         let tasks = Arc::new(T::get_async_tasks());
         if tasks.is_empty() {
-            println!("Warning user has no tasks");
+            println!("Warning user {} has no tasks", T::get_name());
             return tokio::spawn(async move { vec![] }); // just to avoid an infinite loop
         }
         let between = T::get_between();
-        let users_per_second = self.users_per_second;
+        let users_per_second = self.test_config.users_per_second;
         let token = self.token.clone();
         let user_count = count;
         tokio::spawn(async move {
@@ -118,7 +164,7 @@ impl Test {
 
     fn start_timer(&self) -> JoinHandle<()> {
         let token = self.token.clone();
-        match self.runtime {
+        match self.test_config.runtime {
             Some(runtime) => {
                 println!("runtime: {}s", runtime);
                 tokio::spawn(async move {
