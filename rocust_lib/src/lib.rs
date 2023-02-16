@@ -13,7 +13,7 @@ macro_rules! run {
         // get the shared data from the first user type
         let shared = <$user_type as rocust::rocust_lib::traits::User>::Shared::new();
 
-        //decide the weight of each user type and spawn accordingly
+        // decide the weight of each user type and spawn accordingly
         let mut weights = std::collections::HashMap::new();
         weights.insert(stringify!(<$user_type>), <$user_type as rocust::rocust_lib::traits::HasTask>::get_weight());
         $(
@@ -25,7 +25,7 @@ macro_rules! run {
 
         let mut spawn_users_handles_vec = Vec::new();
 
-        //how much to spawn and index interval as parameters
+        // how much to spawn and index interval as parameters
         let mut start_index = 0;
         let spawn_count = counts.get(&stringify!(<$user_type>)).expect("Unreachable Macro error!").clone();
         let spawn_users_handles = $test.spawn_users::<$user_type, <$user_type as rocust::rocust_lib::traits::User>::Shared>(spawn_count,start_index, events_handler.clone(), shared.clone());

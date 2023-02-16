@@ -169,7 +169,7 @@ impl Test {
                 println!("runtime: {}s", runtime);
                 tokio::spawn(async move {
                     tokio::select! {
-                        // this is the ctrl+c or any other signal
+                        // this could be ctrl+c or any other signal
                         _ = token.cancelled() => {
                             println!("received signal");
                         }
@@ -184,7 +184,7 @@ impl Test {
             None => {
                 println!("runtime: infinite");
                 tokio::spawn(async move {
-                    // this is the ctrl+c or any other signal
+                    // this could be ctrl+c or any other signal
                     token.cancelled().await;
                 })
             }
@@ -203,10 +203,10 @@ impl Test {
                     }
                     _ = tokio::time::sleep(std::time::Duration::from_secs(2)) => {
                         let mut all_results_gaurd = all_results_arc_rwlock.write().await;
-                        //update stats
+                        // update stats
                         let elapsed_time = Test::calculate_elapsed_time(&*start_timestamp_arc_rwlock.read().await);
                         all_results_gaurd.calculate_per_second(&elapsed_time);
-                        //print stats
+                        // print stats
                         all_results_gaurd.print_table();
                     }
                 }
@@ -241,7 +241,7 @@ impl Test {
         mpsc::UnboundedSender<ResultMessage>,
         mpsc::UnboundedReceiver<ResultMessage>,
     ) {
-        //set timestamp
+        // set timestamp
         *self.start_timestamp_arc_rwlock.write().await = Instant::now();
         mpsc::unbounded_channel()
     }
@@ -252,23 +252,23 @@ impl Test {
         results_rx: mpsc::UnboundedReceiver<ResultMessage>,
         spawn_users_handles_vec: Vec<JoinHandle<Vec<(JoinHandle<UserInfo>, UserPanicInfo)>>>,
     ) {
-        //start a timer in another task
+        // start a timer in another task
         let timer_handle = self.start_timer();
 
-        //start the background tasks in another task (calculating stats, printing stats, managing files)
+        // start the background tasks in another task (calculating stats, printing stats, managing files)
         let background_tasks_handle = self.start_background_tasks();
 
-        //drop the events_handler to drop the sender sender
+        // drop the events_handler to drop the sender
         drop(events_handler);
 
-        //start the reciever
+        // start the reciever
         self.block_on_reciever(results_rx).await;
         println!("reciever dropped");
 
         // this will cancel the timer and background tasks if the only given user has no tasks so it will finish immediately thus causing the reciever to drop
         self.token.cancel();
 
-        //wait for all users to finish
+        // wait for all users to finish
         for spawn_users_handles in spawn_users_handles_vec {
             if let Ok(handles) = spawn_users_handles.await {
                 for (handle, user_panic_info) in handles {

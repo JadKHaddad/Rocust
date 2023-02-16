@@ -7,7 +7,7 @@ use syn::{parse_macro_input, AttributeArgs};
 pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
     let attrs = parse_macro_input!(attrs as AttributeArgs);
     let mut impl_block = syn::parse_macro_input!(item as syn::ItemImpl);
-    //check if between is set
+    // check if between is set
     let mut min = 0;
     let mut max = 0;
     let mut weight = 1;
@@ -70,7 +70,7 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
 
     let mut methods = Vec::new();
 
-    //collect all the methods names if they have a "proiority" attribute and the value is a number (i32) and delete the attribute
+    // collect all the methods names if they have a "proiority" attribute and the value is a number (i32) and delete the attribute
     for item in impl_block.items.iter_mut() {
         if let syn::ImplItem::Method(method) = item {
             let task_attrs = method
@@ -116,7 +116,7 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
                 }
             }
 
-            //remove the attribute
+            // remove the attribute
             method.attrs.retain(|attr| !attr.path.is_ident("task"));
         }
     }
@@ -132,7 +132,7 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
         }
     });
 
-    //now we can implement the function in the User trait that will inject the tasks in the user struct
+    // now we can implement the function in the User trait that will inject the tasks in the user struct
     let expanded = quote! {
         #impl_block
 
