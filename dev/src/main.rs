@@ -145,20 +145,24 @@ impl User for MyUser3 {
 #[tokio::main]
 async fn main() {
     // export RUSTFLAGS="--cfg tokio_unstable"
+    // export RUST_LOG="debug"
     // $Env:RUSTFLAGS="--cfg tokio_unstable"
-    // console_subscriber::init();
+    // $Env:RUST_LOG="debug"
+    console_subscriber::init();
 
-    let subscriber = tracing_subscriber::fmt().compact().finish();
-    tracing::subscriber::set_global_default(subscriber).unwrap();
-
-    let test_config = TestConfig::new(50, 2, None);
+    //let subscriber = tracing_subscriber::fmt().compact().finish();
+    //tracing::subscriber::set_global_default(subscriber).unwrap();
+    
+    let test_config = TestConfig::new(50, 4, Some(60));
     let test = Test::new(test_config);
     let test_controller = test.get_controller();
 
     tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
         test_controller.stop();
     });
-
+    
     run!(test, MyUser, MyUser2, MyUser3);
+    
+    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
 }
