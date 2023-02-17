@@ -3,6 +3,7 @@ pub mod tasks;
 pub mod test;
 pub mod traits;
 pub mod user;
+pub mod writer;
 
 #[macro_export]
 macro_rules! run {

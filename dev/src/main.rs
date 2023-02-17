@@ -148,11 +148,11 @@ async fn main() {
     // export RUST_LOG="debug"
     // $Env:RUSTFLAGS="--cfg tokio_unstable"
     // $Env:RUST_LOG="debug"
-    console_subscriber::init();
+    // console_subscriber::init();
 
-    //let subscriber = tracing_subscriber::fmt().compact().finish();
-    //tracing::subscriber::set_global_default(subscriber).unwrap();
-    
+    let subscriber = tracing_subscriber::fmt().compact().finish();
+    tracing::subscriber::set_global_default(subscriber).unwrap();
+
     let test_config = TestConfig::new(50, 4, Some(60));
     let test = Test::new(test_config);
     let test_controller = test.get_controller();
@@ -161,8 +161,8 @@ async fn main() {
         tokio::time::sleep(std::time::Duration::from_secs(10)).await;
         test_controller.stop();
     });
-    
+
     run!(test, MyUser, MyUser2, MyUser3);
-    
+
     tokio::time::sleep(std::time::Duration::from_secs(60)).await;
 }
