@@ -1,9 +1,21 @@
-use prettytable::{row, Table};
+use prettytable::{row, Cell, Row, Table};
 use std::{collections::HashMap, time::Duration};
-use tokio::{
-    io::{self, AsyncWriteExt},
-    sync::mpsc::UnboundedSender,
-};
+use tokio::sync::mpsc::UnboundedSender;
+
+const HEADERS: [&'static str; 11] = [
+    "TYPE",
+    "NAME",
+    "TOTAL REQ",
+    "FAILED REQ",
+    "TOTAL ERR",
+    "REQ/S",
+    "FAILED REQ/S",
+    "TOTAL RES TIME",
+    "AVG RES TIME",
+    "MIN RES TIME",
+    "MAX RES TIME",
+];
+const AGR_TYPE_NAME: [&'static str; 2] = ["", "AGR"];
 
 #[derive(Debug, Default, Clone)]
 pub struct Results {
@@ -112,21 +124,47 @@ impl AllResults {
         }
     }
 
-    pub async fn print_table(&self) {
-        let mut table = Table::new();
-        table.add_row(row![
-            "TYPE",
-            "NAME",
-            "TOTAL REQ",
-            "FAILED REQ",
-            "TOTAL ERR",
-            "REQ/S",
-            "FAILED REQ/S",
-            "TOTAL RES TIME",
-            "AVG RES TIME",
-            "MIN RES TIME",
-            "MAX RES TIME",
+    pub fn csv_string(&self) -> String {
+        let mut wtr = csv::Writer::from_writer(vec![]);
+        let _ = wtr.write_record(&HEADERS);
+        for (endpoint_type_name, results) in &self.endpoint_results {
+            let _ = wtr.write_record(&[
+                &endpoint_type_name.0,
+                &endpoint_type_name.1,
+                &results.total_requests.to_string(),
+                &results.total_failed_requests.to_string(),
+                &results.total_errors.to_string(),
+                &results.requests_per_second.to_string(),
+                &results.failed_requests_per_second.to_string(),
+                &results.total_response_time.to_string(),
+                &results.average_response_time.to_string(),
+                &results.min_response_time.to_string(),
+                &results.max_response_time.to_string(),
+            ]);
+        }
+        let _ = wtr.write_record(&[
+            AGR_TYPE_NAME[0],
+            AGR_TYPE_NAME[1],
+            &self.aggrigated_results.total_requests.to_string(),
+            &self.aggrigated_results.total_failed_requests.to_string(),
+            &self.aggrigated_results.total_errors.to_string(),
+            &self.aggrigated_results.requests_per_second.to_string(),
+            &self
+                .aggrigated_results
+                .failed_requests_per_second
+                .to_string(),
+            &self.aggrigated_results.total_response_time.to_string(),
+            &self.aggrigated_results.average_response_time.to_string(),
+            &self.aggrigated_results.min_response_time.to_string(),
+            &self.aggrigated_results.max_response_time.to_string(),
         ]);
+        let data = String::from_utf8(wtr.into_inner().unwrap()).unwrap();
+        data
+    }
+
+    pub fn table_string(&self) -> String {
+        let mut table = Table::new();
+        table.add_row(Row::new(HEADERS.iter().map(|s| Cell::new(s)).collect()));
         for (endpoint_type_name, results) in &self.endpoint_results {
             table.add_row(row![
                 endpoint_type_name.0,
@@ -143,8 +181,8 @@ impl AllResults {
             ]);
         }
         table.add_row(row![
-            " ",
-            "AGR",
+            AGR_TYPE_NAME[0],
+            AGR_TYPE_NAME[1],
             self.aggrigated_results.total_requests,
             self.aggrigated_results.total_failed_requests,
             self.aggrigated_results.total_errors,
@@ -155,8 +193,7 @@ impl AllResults {
             self.aggrigated_results.min_response_time,
             self.aggrigated_results.max_response_time,
         ]);
-        let mut stdout = io::stdout();
-        let _ = stdout.write_all(table.to_string().as_bytes()).await;
+        table.to_string()
     }
 
     pub fn get_by_type(&self, r#type: &str) -> Vec<&Results> {

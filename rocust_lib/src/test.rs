@@ -6,6 +6,7 @@ use crate::{
 use rand::Rng;
 use std::{sync::Arc, time::Duration};
 use tokio::{
+    io::{self, AsyncWriteExt},
     sync::{mpsc, RwLock},
     task::JoinHandle,
     time::Instant,
@@ -209,7 +210,15 @@ impl Test {
                         let elapsed_time = Test::calculate_elapsed_time(&*start_timestamp_arc_rwlock.read().await);
                         all_results_gaurd.calculate_per_second(&elapsed_time);
                         // print stats
-                        all_results_gaurd.print_table().await;
+
+                        let table_string = all_results_gaurd.table_string();
+                        let mut stdout = io::stdout();
+                        let _ = stdout.write_all(table_string.as_bytes()).await;
+
+                        let csv_string = all_results_gaurd.csv_string();
+                        let mut stdout = io::stdout();
+                        let _ = stdout.write_all(csv_string.as_bytes()).await;
+
                     }
                 }
             }
