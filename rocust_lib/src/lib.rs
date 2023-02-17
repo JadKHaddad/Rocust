@@ -1,9 +1,11 @@
+pub mod events;
+pub(crate) mod messages;
 pub mod results;
 pub mod tasks;
 pub mod test;
 pub mod traits;
-pub mod user;
-pub mod writer;
+pub(crate) mod user;
+pub(crate) mod writer;
 
 #[macro_export]
 macro_rules! run {

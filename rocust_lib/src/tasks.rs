@@ -1,7 +1,7 @@
 use std::future::Future;
 use std::pin::Pin;
 
-use crate::results::EventsHandler;
+use crate::events::EventsHandler;
 use crate::traits::Prioritised;
 
 #[derive(Clone)]

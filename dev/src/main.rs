@@ -1,5 +1,5 @@
 use rocust::rocust_lib::{
-    results::EventsHandler,
+    events::EventsHandler,
     run,
     test::{Test, TestConfig},
     traits::{Shared, User},

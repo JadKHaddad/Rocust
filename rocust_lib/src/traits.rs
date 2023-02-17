@@ -44,7 +44,7 @@ where
 
 use rand::{distributions::WeightedIndex, prelude::Distribution};
 
-use crate::results::EventsHandler;
+use crate::events::EventsHandler;
 impl<T> PrioritisedRandom<T> for Vec<T>
 where
     T: Prioritised,

@@ -1,6 +1,5 @@
 use prettytable::{row, Cell, Row, Table};
 use std::{collections::HashMap, time::Duration};
-use tokio::sync::mpsc::UnboundedSender;
 
 const HEADERS: [&'static str; 11] = [
     "TYPE",
@@ -224,59 +223,4 @@ impl AllResults {
     pub fn get_aggrigated(&self) -> &Results {
         &self.aggrigated_results
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct EventsHandler {
-    sender: UnboundedSender<ResultMessage>,
-}
-
-impl EventsHandler {
-    pub fn new(sender: UnboundedSender<ResultMessage>) -> Self {
-        Self { sender }
-    }
-
-    pub fn add_success(&self, r#type: String, name: String, response_time: f64) {
-        let _ = self
-            .sender
-            .send(ResultMessage::Success(SuccessResultMessage {
-                endpoint_type_name: EndpointTypeName(r#type, name),
-                response_time,
-            }));
-    }
-
-    pub fn add_failure(&self, r#type: String, name: String) {
-        let _ = self
-            .sender
-            .send(ResultMessage::Failure(FailureResultMessage {
-                endpoint_type_name: EndpointTypeName(r#type, name),
-            }));
-    }
-
-    pub fn add_error(&self, r#type: String, name: String, error: String) {
-        let _ = self.sender.send(ResultMessage::Error(ErrorResultMessage {
-            endpoint_type_name: EndpointTypeName(r#type, name),
-            error,
-        }));
-    }
-}
-
-pub enum ResultMessage {
-    Success(SuccessResultMessage),
-    Failure(FailureResultMessage),
-    Error(ErrorResultMessage),
-}
-
-pub struct SuccessResultMessage {
-    pub endpoint_type_name: EndpointTypeName,
-    pub response_time: f64,
-}
-
-pub struct FailureResultMessage {
-    pub endpoint_type_name: EndpointTypeName,
-}
-
-pub struct ErrorResultMessage {
-    pub endpoint_type_name: EndpointTypeName,
-    pub error: String,
 }

@@ -1,5 +1,7 @@
 use crate::{
-    results::{AllResults, EventsHandler, ResultMessage},
+    events::EventsHandler,
+    messages::{MainMessage, ResultMessage, UserSpawnedMessage},
+    results::AllResults,
     traits::{HasTask, PrioritisedRandom, Shared, User},
     user::{UserInfo, UserPanicInfo},
 };
@@ -58,6 +60,7 @@ impl TestController {
 pub struct Test {
     test_config: TestConfig,
     token: Arc<CancellationToken>,
+    total_users_spawned_arc_rwlock: Arc<RwLock<u64>>,
     all_results_arc_rwlock: Arc<RwLock<AllResults>>,
     start_timestamp_arc_rwlock: Arc<RwLock<Instant>>,
 }
@@ -67,6 +70,7 @@ impl Test {
         Test {
             test_config,
             token: Arc::new(CancellationToken::new()),
+            total_users_spawned_arc_rwlock: Arc::new(RwLock::new(0)),
             all_results_arc_rwlock: Arc::new(RwLock::new(AllResults::default())),
             start_timestamp_arc_rwlock: Arc::new(RwLock::new(Instant::now())),
         }
@@ -114,15 +118,15 @@ impl Test {
             let mut users_spawned = 0;
             for i in 0..user_count {
                 let id = i as u64 + starting_index;
-                let event_handler = event_handler.clone();
+                let user_event_handler = event_handler.clone();
                 let user_token = token.clone();
                 let spawn_token = user_token.clone();
                 let tasks = tasks.clone();
                 let shared = shared.clone();
                 let handle = tokio::spawn(async move {
-                    let mut user = T::new(id, &event_handler, shared);
+                    let mut user = T::new(id, &user_event_handler, shared);
                     let mut total_tasks: u64 = 0;
-                    user.on_start(&event_handler);
+                    user.on_start(&user_event_handler);
                     loop {
                         // get a random task
                         if let Some(task) = tasks.get_proioritised_random() {
@@ -131,7 +135,7 @@ impl Test {
                                 // this is the sleep time of a user
                                 Test::sleep_between(between).await;
                                 // this is the actual task
-                                task.call(&mut user, &event_handler).await;
+                                task.call(&mut user, &user_event_handler).await;
                                 total_tasks += 1;
                             };
                             // do some sleep or stop
@@ -144,10 +148,16 @@ impl Test {
                             }
                         }
                     }
-                    user.on_stop(&event_handler);
+                    user.on_stop(&user_event_handler);
                     UserInfo::new(id, T::get_name(), total_tasks)
                 });
                 handles.push((handle, UserPanicInfo::new(id, T::get_name())));
+                let _ = event_handler
+                    .sender
+                    .send(MainMessage::UserSpawned(UserSpawnedMessage {
+                        id,
+                        name: T::get_name(),
+                    }));
                 users_spawned += 1;
                 if users_spawned % users_per_second == 0 {
                     tokio::select! {
@@ -196,6 +206,7 @@ impl Test {
 
     fn start_background_tasks(&self) -> JoinHandle<()> {
         let token = self.token.clone();
+        let total_users_spawned_arc_rwlock = self.total_users_spawned_arc_rwlock.clone();
         let all_results_arc_rwlock = self.all_results_arc_rwlock.clone();
         let start_timestamp_arc_rwlock = self.start_timestamp_arc_rwlock.clone();
         tokio::spawn(async move {
@@ -205,6 +216,10 @@ impl Test {
                         break;
                     }
                     _ = tokio::time::sleep(std::time::Duration::from_secs(2)) => {
+
+                        let total_users_spawned_gaurd = total_users_spawned_arc_rwlock.read().await;
+                        tracing::info!("Total users spawned: [{}]", *total_users_spawned_gaurd);
+
                         let mut all_results_gaurd = all_results_arc_rwlock.write().await;
                         // update stats
                         let elapsed_time = Test::calculate_elapsed_time(&*start_timestamp_arc_rwlock.read().await);
@@ -225,22 +240,33 @@ impl Test {
         })
     }
 
-    async fn block_on_reciever(&self, mut results_rx: mpsc::UnboundedReceiver<ResultMessage>) {
-        while let Some(result_msg) = results_rx.recv().await {
-            let mut all_results_gaurd = self.all_results_arc_rwlock.write().await;
-            match result_msg {
-                ResultMessage::Success(sucess_result_msg) => {
-                    all_results_gaurd.add_success(
-                        sucess_result_msg.endpoint_type_name,
-                        sucess_result_msg.response_time,
-                    );
+    async fn block_on_reciever(&self, mut results_rx: mpsc::UnboundedReceiver<MainMessage>) {
+        while let Some(msg) = results_rx.recv().await {
+            match msg {
+                MainMessage::ResultMessage(result_msg) => {
+                    let mut all_results_gaurd = self.all_results_arc_rwlock.write().await;
+                    match result_msg {
+                        ResultMessage::Success(sucess_result_msg) => {
+                            all_results_gaurd.add_success(
+                                sucess_result_msg.endpoint_type_name,
+                                sucess_result_msg.response_time,
+                            );
+                        }
+                        ResultMessage::Failure(failure_result_msg) => {
+                            all_results_gaurd.add_failure(failure_result_msg.endpoint_type_name);
+                        }
+                        ResultMessage::Error(error_result_msg) => {
+                            all_results_gaurd.add_error(
+                                error_result_msg.endpoint_type_name,
+                                error_result_msg.error,
+                            );
+                        }
+                    }
                 }
-                ResultMessage::Failure(failure_result_msg) => {
-                    all_results_gaurd.add_failure(failure_result_msg.endpoint_type_name);
-                }
-                ResultMessage::Error(error_result_msg) => {
-                    all_results_gaurd
-                        .add_error(error_result_msg.endpoint_type_name, error_result_msg.error);
+                MainMessage::UserSpawned(_) => {
+                    let mut total_users_spawned_gaurd =
+                        self.total_users_spawned_arc_rwlock.write().await;
+                    *total_users_spawned_gaurd += 1;
                 }
             }
         }
@@ -249,8 +275,8 @@ impl Test {
     pub async fn before_spawn_users(
         &self,
     ) -> (
-        mpsc::UnboundedSender<ResultMessage>,
-        mpsc::UnboundedReceiver<ResultMessage>,
+        mpsc::UnboundedSender<MainMessage>,
+        mpsc::UnboundedReceiver<MainMessage>,
     ) {
         // set timestamp
         *self.start_timestamp_arc_rwlock.write().await = Instant::now();
@@ -260,7 +286,7 @@ impl Test {
     pub async fn after_spawn_users(
         &self,
         events_handler: EventsHandler,
-        results_rx: mpsc::UnboundedReceiver<ResultMessage>,
+        results_rx: mpsc::UnboundedReceiver<MainMessage>,
         spawn_users_handles_vec: Vec<JoinHandle<Vec<(JoinHandle<UserInfo>, UserPanicInfo)>>>,
     ) {
         // start a timer in another task
