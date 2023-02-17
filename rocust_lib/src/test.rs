@@ -348,3 +348,10 @@ impl Test {
         tracing::info!("Test finished");
     }
 }
+
+impl Drop for Test {
+    // test is not clone so this is fine to stop the test on drop
+    fn drop(&mut self) {
+        self.token.cancel();
+    }
+}
