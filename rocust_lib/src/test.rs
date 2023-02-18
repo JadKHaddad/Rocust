@@ -18,7 +18,7 @@ use tokio_util::sync::CancellationToken;
 
 pub struct TestConfig {
     pub user_count: u64,
-    pub users_per_second: u64,
+    pub users_per_sec: u64,
     pub runtime: Option<u64>,
     pub update_interval_in_secs: u64,
     pub addr: SocketAddr,
@@ -27,14 +27,14 @@ pub struct TestConfig {
 impl TestConfig {
     pub fn new(
         user_count: u64,
-        users_per_second: u64,
+        users_per_sec: u64,
         runtime: Option<u64>,
         update_interval_in_secs: u64,
         addr: SocketAddr,
     ) -> Self {
         TestConfig {
             user_count,
-            users_per_second,
+            users_per_sec,
             runtime,
             update_interval_in_secs,
             addr,
@@ -122,7 +122,7 @@ impl Test {
             return tokio::spawn(async move { vec![] }); // just to avoid an infinite loop
         }
         let between = T::get_between();
-        let users_per_second = self.test_config.users_per_second;
+        let users_per_sec = self.test_config.users_per_sec;
         let token = self.token.clone();
         let user_count = count;
         tokio::spawn(async move {
@@ -171,7 +171,7 @@ impl Test {
                         name: T::get_name(),
                     }));
                 users_spawned += 1;
-                if users_spawned % users_per_second == 0 {
+                if users_spawned % users_per_sec == 0 {
                     tokio::select! {
                         _ = spawn_token.cancelled() => {
                             break;
