@@ -157,7 +157,7 @@ async fn main() {
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    let test_config = TestConfig::new(50, 4, Some(60), SocketAddr::from(([127, 0, 0, 1], 3000)));
+    let test_config = TestConfig::new(50, 4, Some(60), 2, SocketAddr::from(([127, 0, 0, 1], 3000)));
     let test = Test::new(test_config);
     let test_controller = test.get_controller();
 

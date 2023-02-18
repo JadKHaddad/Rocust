@@ -20,6 +20,7 @@ pub struct TestConfig {
     pub user_count: u64,
     pub users_per_second: u64,
     pub runtime: Option<u64>,
+    pub update_interval_in_secs: u64,
     pub addr: SocketAddr,
 }
 
@@ -28,12 +29,14 @@ impl TestConfig {
         user_count: u64,
         users_per_second: u64,
         runtime: Option<u64>,
+        update_interval_in_secs: u64,
         addr: SocketAddr,
     ) -> Self {
         TestConfig {
             user_count,
             users_per_second,
             runtime,
+            update_interval_in_secs,
             addr,
         }
     }
@@ -232,13 +235,14 @@ impl Test {
         let total_users_spawned_arc_rwlock = self.total_users_spawned_arc_rwlock.clone();
         let all_results_arc_rwlock = self.all_results_arc_rwlock.clone();
         let start_timestamp_arc_rwlock = self.start_timestamp_arc_rwlock.clone();
+        let update_interval_in_secs = self.test_config.update_interval_in_secs;
         tokio::spawn(async move {
             loop {
                 tokio::select! {
                     _ = token.cancelled() => {
                         break;
                     }
-                    _ = tokio::time::sleep(std::time::Duration::from_secs(2)) => {
+                    _ = tokio::time::sleep(std::time::Duration::from_secs(update_interval_in_secs)) => {
 
                         let total_users_spawned_gaurd = total_users_spawned_arc_rwlock.read().await;
                         tracing::info!("Total users spawned: [{}]", *total_users_spawned_gaurd);
