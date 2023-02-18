@@ -174,7 +174,7 @@ async fn main() {
         test_controller.stop();
     });
 
-    run!(test, MyUser, MyUser2, MyUser3);
+    run!(test, MyUser, MyUser2, MyUser3).await;
 
     tokio::time::sleep(std::time::Duration::from_secs(60)).await;
 }
