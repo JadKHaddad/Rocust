@@ -6,8 +6,9 @@ use rocust::rocust_lib::{
 };
 
 use rocust::rocust_macros::has_task;
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
+use tracing_subscriber::EnvFilter;
 
 #[derive(Clone)]
 struct MyShared {
@@ -150,15 +151,18 @@ async fn main() {
     // $Env:RUST_LOG="debug"
     // console_subscriber::init();
 
-    let subscriber = tracing_subscriber::fmt().compact().finish();
+    let subscriber = tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .compact()
+        .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    let test_config = TestConfig::new(50, 4, Some(60));
+    let test_config = TestConfig::new(50, 4, Some(60), SocketAddr::from(([127, 0, 0, 1], 3000)));
     let test = Test::new(test_config);
     let test_controller = test.get_controller();
 
     tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(20)).await;
         test_controller.stop();
     });
 

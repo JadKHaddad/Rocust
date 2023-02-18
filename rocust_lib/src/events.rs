@@ -1,10 +1,10 @@
-use tokio::sync::mpsc::UnboundedSender;
 use crate::{
     messages::{
         ErrorResultMessage, FailureResultMessage, MainMessage, ResultMessage, SuccessResultMessage,
     },
     results::EndpointTypeName,
 };
+use tokio::sync::mpsc::UnboundedSender;
 
 #[derive(Debug, Clone)]
 pub struct EventsHandler {

@@ -1,4 +1,5 @@
 use prettytable::{row, Cell, Row, Table};
+use serde::Serialize;
 use std::{collections::HashMap, time::Duration};
 
 const HEADERS: [&'static str; 11] = [
@@ -16,7 +17,7 @@ const HEADERS: [&'static str; 11] = [
 ];
 const AGR_TYPE_NAME: [&'static str; 2] = ["", "AGR"];
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct Results {
     pub total_requests: u32,
     pub total_failed_requests: u32,
@@ -70,10 +71,10 @@ impl Results {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize)]
 pub struct EndpointTypeName(pub String, pub String);
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize)]
 pub struct AllResults {
     aggrigated_results: Results,
     endpoint_results: HashMap<EndpointTypeName, Results>,

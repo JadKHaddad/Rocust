@@ -2,11 +2,12 @@ use crate::{
     events::EventsHandler,
     messages::{MainMessage, ResultMessage, UserSpawnedMessage},
     results::AllResults,
+    server::Server,
     traits::{HasTask, PrioritisedRandom, Shared, User},
     user::{UserInfo, UserPanicInfo},
 };
 use rand::Rng;
-use std::{sync::Arc, time::Duration};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     io::{self, AsyncWriteExt},
     sync::{mpsc, RwLock},
@@ -19,18 +20,26 @@ pub struct TestConfig {
     pub user_count: u64,
     pub users_per_second: u64,
     pub runtime: Option<u64>,
+    pub addr: SocketAddr,
 }
 
 impl TestConfig {
-    pub fn new(user_count: u64, users_per_second: u64, runtime: Option<u64>) -> Self {
+    pub fn new(
+        user_count: u64,
+        users_per_second: u64,
+        runtime: Option<u64>,
+        addr: SocketAddr,
+    ) -> Self {
         TestConfig {
             user_count,
             users_per_second,
             runtime,
+            addr,
         }
     }
 }
 
+#[derive(Clone)]
 pub struct TestController {
     token: Arc<CancellationToken>,
     all_results_arc_rwlock: Arc<RwLock<AllResults>>,
@@ -204,6 +213,31 @@ impl Test {
         }
     }
 
+    fn strat_server(&self) -> JoinHandle<()> {
+        let test_controller = self.get_controller().clone();
+        let token = self.token.clone();
+        let addr = self.test_config.addr;
+        tokio::spawn(async move {
+            let server = Server::new(test_controller, addr);
+            tracing::info!("Listening on {}", addr);
+            tokio::select! {
+                _ = server.run() => {
+                    // match result {
+                    //     Ok(_) => {
+
+                    //     }
+                    //     Err(e) => {
+                    //         tracing::error!("Server error: {}", e);
+                    //     }
+                    // }
+                }
+                _ = token.cancelled() => {
+                    tracing::info!("Server recieved signal and is shutting down");
+                }
+            }
+        })
+    }
+
     fn start_background_tasks(&self) -> JoinHandle<()> {
         let token = self.token.clone();
         let total_users_spawned_arc_rwlock = self.total_users_spawned_arc_rwlock.clone();
@@ -230,10 +264,9 @@ impl Test {
                         let mut stdout = io::stdout();
                         let _ = stdout.write_all(table_string.as_bytes()).await;
 
-                        let csv_string = all_results_gaurd.csv_string();
-                        let mut stdout = io::stdout();
-                        let _ = stdout.write_all(csv_string.as_bytes()).await;
-
+                        // let csv_string = all_results_gaurd.csv_string();
+                        // let mut stdout = io::stdout();
+                        // let _ = stdout.write_all(csv_string.as_bytes()).await;
                     }
                 }
             }
@@ -289,6 +322,9 @@ impl Test {
         results_rx: mpsc::UnboundedReceiver<MainMessage>,
         spawn_users_handles_vec: Vec<JoinHandle<Vec<(JoinHandle<UserInfo>, UserPanicInfo)>>>,
     ) {
+        // spin up a server
+        let server_handle = self.strat_server();
+
         // start a timer in another task
         let timer_handle = self.start_timer();
 
@@ -309,6 +345,7 @@ impl Test {
         for spawn_users_handles in spawn_users_handles_vec {
             if let Ok(handles) = spawn_users_handles.await {
                 for (handle, user_panic_info) in handles {
+                    // TODO: create summary of all users and save it to a file
                     match handle.await {
                         Ok(user_info) => {
                             tracing::info!(
@@ -338,6 +375,8 @@ impl Test {
                 }
             }
         }
+        server_handle.await.unwrap();
+        tracing::debug!("Server finished");
 
         background_tasks_handle.await.unwrap();
         tracing::debug!("Background tasks finished");
