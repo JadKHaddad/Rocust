@@ -25,7 +25,7 @@ pub struct TestConfig {
     pub update_interval_in_secs: u64,
     pub current_results_file: Option<String>,
     pub results_history_file: Option<String>,
-    pub addr: SocketAddr,
+    pub addr: Option<SocketAddr>,
 }
 
 impl TestConfig {
@@ -36,7 +36,7 @@ impl TestConfig {
         update_interval_in_secs: u64,
         current_results_file: Option<String>,
         results_history_file: Option<String>,
-        addr: SocketAddr,
+        addr: Option<SocketAddr>,
     ) -> Self {
         TestConfig {
             user_count,
@@ -110,18 +110,16 @@ impl Test {
                     // write header
                     let header = AllResults::history_header_csv_string();
                     match header {
-                        Ok(header) => {
-                            match writer.write_all(header.as_bytes()).await {
-                                Ok(_) => (),
-                                Err(e) => {
-                                    tracing::error!(
-                                        "Failed to write header to results history file: [{}]",
-                                        e
-                                    );
-                                }
+                        Ok(header) => match writer.write_all(header.as_bytes()).await {
+                            Ok(_) => Some(writer),
+                            Err(e) => {
+                                tracing::error!(
+                                    "Failed to write header to results history file: [{}]",
+                                    e
+                                );
+                                None
                             }
-                            Some(writer)
-                        }
+                        },
                         Err(e) => {
                             tracing::error!(
                                 "Failed to create header for results history file: [{}]",
@@ -281,15 +279,23 @@ impl Test {
     fn strat_server(&self) -> JoinHandle<()> {
         let test_controller = self.get_controller().clone();
         let addr = self.test_config.addr;
-        tokio::spawn(async move {
-            let server = Server::new(test_controller, addr);
-            tracing::info!("Listening on {}", addr);
-            // no tokio::select! here because axum is running with graceful shutdown
-            let res = server.run().await;
-            if let Err(e) = res {
-                tracing::error!("Server error: {}", e);
+        match addr {
+            Some(addr) => {
+                tracing::info!("Server listening on [{}]", addr);
+                tokio::spawn(async move {
+                    let server = Server::new(test_controller, addr);
+                    // no tokio::select! here because axum is running with graceful shutdown
+                    let res = server.run().await;
+                    if let Err(e) = res {
+                        tracing::error!("Server error: {}", e);
+                    }
+                })
             }
-        })
+            None => {
+                tracing::info!("Server disabled");
+                tokio::spawn(async move {})
+            }
+        }
     }
 
     fn start_background_tasks(&self) -> JoinHandle<()> {
@@ -439,45 +445,56 @@ impl Test {
 
         // wait for all users to finish
         for spawn_users_handles in spawn_users_handles_vec {
-            if let Ok(handles) = spawn_users_handles.await {
-                for (handle, user_panic_info) in handles {
-                    // TODO: create summary of all users and save it to a file
-                    match handle.await {
-                        Ok(user_info) => {
-                            tracing::info!(
-                                "User [{}][{}] finished with [{}] tasks",
-                                user_info.name,
-                                user_info.id,
-                                user_info.total_tasks
-                            )
-                        }
-                        Err(e) => {
-                            if e.is_cancelled() {
-                                tracing::warn!(
-                                    "User [{}][{}] was cancelled",
-                                    user_panic_info.name,
-                                    user_panic_info.id
+            match spawn_users_handles.await {
+                Ok(handles) => {
+                    for (handle, user_panic_info) in handles {
+                        // TODO: create summary of all users and save it to a file
+                        match handle.await {
+                            Ok(user_info) => {
+                                tracing::info!(
+                                    "User [{}][{}] finished with [{}] tasks",
+                                    user_info.name,
+                                    user_info.id,
+                                    user_info.total_tasks
                                 )
                             }
-                            if e.is_panic() {
-                                tracing::error!(
-                                    "User [{}][{}] panicked",
-                                    user_panic_info.name,
-                                    user_panic_info.id
-                                )
+                            Err(e) => {
+                                if e.is_cancelled() {
+                                    tracing::warn!(
+                                        "User [{}][{}] was cancelled",
+                                        user_panic_info.name,
+                                        user_panic_info.id
+                                    )
+                                }
+                                if e.is_panic() {
+                                    tracing::error!(
+                                        "User [{}][{}] panicked",
+                                        user_panic_info.name,
+                                        user_panic_info.id
+                                    )
+                                }
                             }
                         }
                     }
                 }
+                Err(e) => {
+                    tracing::error!("Error joining users: {}", e);
+                }
             }
         }
-        server_handle.await.unwrap();
+        if let Err(e) = server_handle.await {
+            tracing::error!("Error joining server: {}", e);
+        }
         tracing::debug!("Server finished");
 
-        background_tasks_handle.await.unwrap();
+        if let Err(e) = background_tasks_handle.await {
+            tracing::error!("Error joining background tasks: {}", e);
+        }
         tracing::debug!("Background tasks finished");
 
-        timer_handle.await.unwrap();
+        if let Err(e) = timer_handle.await {
+            tracing::error!("Error joining timer: {}", e);
+        }
         tracing::debug!("Timer finished");
 
         tracing::info!("Test finished");
