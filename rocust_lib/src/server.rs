@@ -34,6 +34,5 @@ async fn stop(State(test_controller): State<TestController>) -> impl IntoRespons
 
 async fn get_results(State(test_controller): State<TestController>) -> impl IntoResponse {
     let results = test_controller.get_results().await;
-    // TODO: key must be a string
     Json(results)
 }

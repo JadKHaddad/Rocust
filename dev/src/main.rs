@@ -162,7 +162,7 @@ async fn main() {
     let test_controller = test.get_controller();
 
     tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(20)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
         test_controller.stop();
     });
 

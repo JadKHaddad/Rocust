@@ -71,8 +71,18 @@ impl Results {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct EndpointTypeName(pub String, pub String);
+
+impl Serialize for EndpointTypeName {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let type_name = format!("{}${}", self.0, self.1);
+        serializer.serialize_str(&type_name)
+    }
+}
 
 #[derive(Debug, Default, Clone, Serialize)]
 pub struct AllResults {
