@@ -1,3 +1,5 @@
+use async_trait::async_trait;
+
 pub trait HasTask {
     fn get_async_tasks() -> Vec<crate::tasks::AsyncTask<Self>>
     where
@@ -18,17 +20,25 @@ pub trait HasTask {
         1
     }
 }
-
+#[async_trait]
 pub trait User: Send + Sized {
     type Shared: Shared;
 
-    fn new(_id: u64, _handler: &EventsHandler, _shared: Self::Shared) -> Self; // TODO: pass test config and a test controller to be able to stop the test based on some user defined conditions
-    fn on_start(&mut self, _handler: &EventsHandler) {}
-    fn on_stop(&mut self, _handler: &EventsHandler) {}
+    // TODO: maybe ARC?
+    async fn new(
+        _id: u64,
+        _test_config: TestConfig,
+        _test_controller: TestController,
+        _handler: &EventsHandler,
+        _shared: Self::Shared,
+    ) -> Self;
+    async fn on_start(&mut self, _handler: &EventsHandler) {}
+    async fn on_stop(&mut self, _handler: &EventsHandler) {}
 }
 
+#[async_trait]
 pub trait Shared: Clone + Send {
-    fn new() -> Self;
+    async fn new() -> Self;
 }
 
 pub trait Prioritised {
@@ -44,7 +54,10 @@ where
 
 use rand::{distributions::WeightedIndex, prelude::Distribution};
 
-use crate::events::EventsHandler;
+use crate::{
+    events::EventsHandler,
+    test::{TestConfig, TestController},
+};
 impl<T> PrioritisedRandom<T> for Vec<T>
 where
     T: Prioritised,
@@ -60,6 +73,7 @@ where
     }
 }
 
+#[async_trait]
 impl Shared for () {
-    fn new() -> Self {}
+    async fn new() -> Self {}
 }

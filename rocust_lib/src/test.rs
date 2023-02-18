@@ -18,6 +18,7 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 
+#[derive(Clone)]
 pub struct TestConfig {
     pub user_count: u64,
     pub users_per_sec: u64,
@@ -185,6 +186,8 @@ impl Test {
         let users_per_sec = self.test_config.users_per_sec;
         let token = self.token.clone();
         let user_count = count;
+        let test_config = self.test_config.clone();
+        let test_controller = self.get_controller();
         tokio::spawn(async move {
             let mut handles = vec![];
             let mut users_spawned = 0;
@@ -195,10 +198,19 @@ impl Test {
                 let spawn_token = user_token.clone();
                 let tasks = tasks.clone();
                 let shared = shared.clone();
+                let test_config = test_config.clone();
+                let test_controller = test_controller.clone();
                 let handle = tokio::spawn(async move {
-                    let mut user = T::new(id, &user_event_handler, shared);
+                    let mut user = T::new(
+                        id,
+                        test_config,
+                        test_controller,
+                        &user_event_handler,
+                        shared,
+                    )
+                    .await;
                     let mut total_tasks: u64 = 0;
-                    user.on_start(&user_event_handler);
+                    user.on_start(&user_event_handler).await;
                     loop {
                         // get a random task
                         if let Some(task) = tasks.get_proioritised_random() {
@@ -220,7 +232,7 @@ impl Test {
                             }
                         }
                     }
-                    user.on_stop(&user_event_handler);
+                    user.on_stop(&user_event_handler).await;
                     UserInfo::new(id, T::get_name(), total_tasks)
                 });
                 handles.push((handle, UserPanicInfo::new(id, T::get_name())));

@@ -17,7 +17,7 @@ macro_rules! run {
             let events_handler = EventsHandler::new(results_tx);
 
             // get the shared data from the first user type
-            let shared = <$user_type as rocust::rocust_lib::traits::User>::Shared::new();
+            let shared = <$user_type as rocust::rocust_lib::traits::User>::Shared::new().await;
 
             // decide the weight of each user type and spawn accordingly
             let mut weights = std::collections::HashMap::new();
