@@ -1,7 +1,7 @@
-use std::path::PathBuf;
+use std::{io::Result as StdIoResult, path::PathBuf};
 use tokio::{
     fs::{create_dir_all, File},
-    io::{self, AsyncWriteExt},
+    io::{self as TokoiIo, AsyncWriteExt},
 };
 
 #[derive(Clone)]
@@ -10,16 +10,18 @@ pub struct Writer {
 }
 
 impl Writer {
-    pub async fn new(path: PathBuf) -> std::io::Result<Self> {
-        create_dir_all(&path).await?;
-        Ok(Self { path })
+    async fn new(path: PathBuf) -> StdIoResult<Self> {
+        if let Some(parent) = path.parent() {
+            create_dir_all(parent).await?;
+        }
+        Ok(Writer { path })
     }
 
-    pub async fn from_str(path: &str) -> std::io::Result<Self> {
+    pub async fn from_str(path: &str) -> StdIoResult<Self> {
         Self::new(PathBuf::from(path)).await
     }
 
-    pub async fn write_all(&self, data: &Vec<u8>) -> io::Result<()> {
+    pub async fn write_all(&self, data: &[u8]) -> TokoiIo::Result<()> {
         let mut file = File::create(&self.path).await?;
         file.write_all(data).await?;
         Ok(())

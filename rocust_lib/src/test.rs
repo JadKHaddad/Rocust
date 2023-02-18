@@ -5,6 +5,7 @@ use crate::{
     server::Server,
     traits::{HasTask, PrioritisedRandom, Shared, User},
     user::{UserInfo, UserPanicInfo},
+    writer::Writer,
 };
 use rand::Rng;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
@@ -21,6 +22,7 @@ pub struct TestConfig {
     pub users_per_sec: u64,
     pub runtime: Option<u64>,
     pub update_interval_in_secs: u64,
+    pub current_results_file: Option<String>,
     pub addr: SocketAddr,
 }
 
@@ -30,6 +32,7 @@ impl TestConfig {
         users_per_sec: u64,
         runtime: Option<u64>,
         update_interval_in_secs: u64,
+        current_results_file: Option<String>,
         addr: SocketAddr,
     ) -> Self {
         TestConfig {
@@ -37,6 +40,7 @@ impl TestConfig {
             users_per_sec,
             runtime,
             update_interval_in_secs,
+            current_results_file,
             addr,
         }
     }
@@ -72,16 +76,30 @@ impl TestController {
 pub struct Test {
     test_config: TestConfig,
     token: Arc<CancellationToken>,
+    current_results_writer: Option<Writer>,
     total_users_spawned_arc_rwlock: Arc<RwLock<u64>>,
     all_results_arc_rwlock: Arc<RwLock<AllResults>>,
     start_timestamp_arc_rwlock: Arc<RwLock<Instant>>,
 }
 
 impl Test {
-    pub fn new(test_config: TestConfig) -> Self {
+    pub async fn new(test_config: TestConfig) -> Self {
+        let current_results_writer =
+            if let Some(current_results_file) = &test_config.current_results_file {
+                match Writer::from_str(current_results_file).await {
+                    Ok(writer) => Some(writer),
+                    Err(e) => {
+                        tracing::error!("Failed to create writer for current results file: {}", e);
+                        None
+                    }
+                }
+            } else {
+                None
+            };
         Test {
             test_config,
             token: Arc::new(CancellationToken::new()),
+            current_results_writer,
             total_users_spawned_arc_rwlock: Arc::new(RwLock::new(0)),
             all_results_arc_rwlock: Arc::new(RwLock::new(AllResults::default())),
             start_timestamp_arc_rwlock: Arc::new(RwLock::new(Instant::now())),
@@ -236,6 +254,7 @@ impl Test {
         let all_results_arc_rwlock = self.all_results_arc_rwlock.clone();
         let start_timestamp_arc_rwlock = self.start_timestamp_arc_rwlock.clone();
         let update_interval_in_secs = self.test_config.update_interval_in_secs;
+        let current_results_writer = self.current_results_writer.clone();
         tokio::spawn(async move {
             loop {
                 tokio::select! {
@@ -251,15 +270,22 @@ impl Test {
                         // update stats
                         let elapsed_time = Test::calculate_elapsed_time(&*start_timestamp_arc_rwlock.read().await);
                         all_results_gaurd.calculate_per_second(&elapsed_time);
-                        // print stats
 
+                        // print stats
                         let table_string = all_results_gaurd.table_string();
                         let mut stdout = io::stdout();
                         let _ = stdout.write_all(table_string.as_bytes()).await;
 
-                        // let csv_string = all_results_gaurd.csv_string();
-                        // let mut stdout = io::stdout();
-                        // let _ = stdout.write_all(csv_string.as_bytes()).await;
+                        // write current results to csv
+                        if let Some(writer) = &current_results_writer {
+                            let csv_string = all_results_gaurd.csv_string();
+                            match writer.write_all(csv_string.as_bytes()).await {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    tracing::error!("Error writing to csv: {}", e);
+                                }
+                            }
+                        }
                     }
                 }
             }

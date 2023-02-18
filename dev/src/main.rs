@@ -157,12 +157,19 @@ async fn main() {
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    let test_config = TestConfig::new(50, 4, Some(60), 2, SocketAddr::from(([127, 0, 0, 1], 3000)));
-    let test = Test::new(test_config);
+    let test_config = TestConfig::new(
+        50,
+        4,
+        Some(60),
+        2,
+        Some(String::from("results/current_results.csv")),
+        SocketAddr::from(([127, 0, 0, 1], 3000)),
+    );
+    let test = Test::new(test_config).await;
     let test_controller = test.get_controller();
 
     tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(20)).await;
         test_controller.stop();
     });
 
