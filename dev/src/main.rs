@@ -163,6 +163,7 @@ async fn main() {
         Some(60),
         2,
         Some(String::from("results/current_results.csv")),
+        Some(String::from("results/results_history.csv")),
         SocketAddr::from(([127, 0, 0, 1], 3000)),
     );
     let test = Test::new(test_config).await;

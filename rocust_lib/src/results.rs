@@ -15,6 +15,7 @@ const HEADERS: [&'static str; 11] = [
     "MIN RES TIME",
     "MAX RES TIME",
 ];
+
 const AGR_TYPE_NAME: [&'static str; 2] = ["", "AGR"];
 
 #[derive(Debug, Default, Clone, Serialize)]
@@ -90,6 +91,7 @@ pub struct AllResults {
     endpoint_results: HashMap<EndpointTypeName, Results>,
 }
 
+// TODO: remove unwraps and return results. refactor repeated code
 impl AllResults {
     pub fn add_success(&mut self, endpoint_type_name: EndpointTypeName, response_time: f64) {
         self.aggrigated_results.add_success(response_time);
@@ -134,7 +136,39 @@ impl AllResults {
         }
     }
 
-    pub fn csv_string(&self) -> String {
+    pub fn history_header_csv_string() -> String {
+        let mut wtr = csv::Writer::from_writer(vec![]);
+        let headers_with_timestamp = [&["TIMESTAMP"], &HEADERS[..]].concat();
+        let _ = wtr.write_record(&headers_with_timestamp);
+        let data = String::from_utf8(wtr.into_inner().unwrap()).unwrap();
+        data
+    }
+
+    pub fn current_aggrigated_results_with_timestamp_csv_string(&self, timestamp: &str) -> String {
+        let mut wtr = csv::Writer::from_writer(vec![]);
+        let _ = wtr.write_record(&[
+            timestamp,
+            AGR_TYPE_NAME[0],
+            AGR_TYPE_NAME[1],
+            &self.aggrigated_results.total_requests.to_string(),
+            &self.aggrigated_results.total_failed_requests.to_string(),
+            &self.aggrigated_results.total_errors.to_string(),
+            &self.aggrigated_results.requests_per_second.to_string(),
+            &self
+                .aggrigated_results
+                .failed_requests_per_second
+                .to_string(),
+            &self.aggrigated_results.total_response_time.to_string(),
+            &self.aggrigated_results.average_response_time.to_string(),
+            &self.aggrigated_results.min_response_time.to_string(),
+            &self.aggrigated_results.median_response_time.to_string(),
+            &self.aggrigated_results.max_response_time.to_string(),
+        ]);
+        let data = String::from_utf8(wtr.into_inner().unwrap()).unwrap();
+        data
+    }
+
+    pub fn current_results_csv_string(&self) -> String {
         let mut wtr = csv::Writer::from_writer(vec![]);
         let _ = wtr.write_record(&HEADERS);
         for (endpoint_type_name, results) in &self.endpoint_results {

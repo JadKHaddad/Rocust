@@ -1,6 +1,6 @@
 use std::{io::Result as StdIoResult, path::PathBuf};
 use tokio::{
-    fs::{create_dir_all, File},
+    fs::{create_dir_all, File, OpenOptions},
     io::{self as TokoiIo, AsyncWriteExt},
 };
 
@@ -23,6 +23,16 @@ impl Writer {
 
     pub async fn write_all(&self, data: &[u8]) -> TokoiIo::Result<()> {
         let mut file = File::create(&self.path).await?;
+        file.write_all(data).await?;
+        Ok(())
+    }
+
+    pub async fn append_all(&self, data: &[u8]) -> TokoiIo::Result<()> {
+        let mut file = OpenOptions::new()
+            .write(true)
+            .append(true)
+            .open(&self.path)
+            .await?;
         file.write_all(data).await?;
         Ok(())
     }
