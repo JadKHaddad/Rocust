@@ -1,6 +1,7 @@
+use csv::{Error as CsvError, IntoInnerError as CsvIntoInnerError, Writer as CsvWriter};
 use prettytable::{row, Cell, Row, Table};
 use serde::Serialize;
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, fmt::Display, string::FromUtf8Error, time::Duration};
 
 const HEADERS: [&'static str; 11] = [
     "TYPE",
@@ -91,7 +92,41 @@ pub struct AllResults {
     endpoint_results: HashMap<EndpointTypeName, Results>,
 }
 
-// TODO: remove unwraps and return results. refactor repeated code
+pub enum CSVError {
+    FromUtf8Error(FromUtf8Error),
+    CsvError(CsvError),
+    IntoInnerError(CsvIntoInnerError<CsvWriter<Vec<u8>>>),
+}
+
+impl Display for CSVError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CSVError::FromUtf8Error(error) => write!(f, "FromUtf8Error: {}", error),
+            CSVError::CsvError(error) => write!(f, "CsvError: {}", error),
+            CSVError::IntoInnerError(error) => write!(f, "IntoInnerError: {}", error),
+        }
+    }
+}
+
+impl From<FromUtf8Error> for CSVError {
+    fn from(error: FromUtf8Error) -> Self {
+        CSVError::FromUtf8Error(error)
+    }
+}
+
+impl From<CsvError> for CSVError {
+    fn from(error: CsvError) -> Self {
+        CSVError::CsvError(error)
+    }
+}
+
+impl From<CsvIntoInnerError<CsvWriter<Vec<u8>>>> for CSVError {
+    fn from(error: CsvIntoInnerError<CsvWriter<Vec<u8>>>) -> Self {
+        CSVError::IntoInnerError(error)
+    }
+}
+
+// TODO: refactor repeated code
 impl AllResults {
     pub fn add_success(&mut self, endpoint_type_name: EndpointTypeName, response_time: f64) {
         self.aggrigated_results.add_success(response_time);
@@ -136,17 +171,20 @@ impl AllResults {
         }
     }
 
-    pub fn history_header_csv_string() -> String {
-        let mut wtr = csv::Writer::from_writer(vec![]);
+    pub fn history_header_csv_string() -> Result<String, CSVError> {
+        let mut wtr = CsvWriter::from_writer(vec![]);
         let headers_with_timestamp = [&["TIMESTAMP"], &HEADERS[..]].concat();
-        let _ = wtr.write_record(&headers_with_timestamp);
-        let data = String::from_utf8(wtr.into_inner().unwrap()).unwrap();
-        data
+        wtr.write_record(&headers_with_timestamp)?;
+        let data = String::from_utf8(wtr.into_inner()?)?;
+        Ok(data)
     }
 
-    pub fn current_aggrigated_results_with_timestamp_csv_string(&self, timestamp: &str) -> String {
-        let mut wtr = csv::Writer::from_writer(vec![]);
-        let _ = wtr.write_record(&[
+    pub fn current_aggrigated_results_with_timestamp_csv_string(
+        &self,
+        timestamp: &str,
+    ) -> Result<String, CSVError> {
+        let mut wtr = CsvWriter::from_writer(vec![]);
+        wtr.write_record(&[
             timestamp,
             AGR_TYPE_NAME[0],
             AGR_TYPE_NAME[1],
@@ -163,16 +201,16 @@ impl AllResults {
             &self.aggrigated_results.min_response_time.to_string(),
             &self.aggrigated_results.median_response_time.to_string(),
             &self.aggrigated_results.max_response_time.to_string(),
-        ]);
-        let data = String::from_utf8(wtr.into_inner().unwrap()).unwrap();
-        data
+        ])?;
+        let data = String::from_utf8(wtr.into_inner()?)?;
+        Ok(data)
     }
 
-    pub fn current_results_csv_string(&self) -> String {
-        let mut wtr = csv::Writer::from_writer(vec![]);
-        let _ = wtr.write_record(&HEADERS);
+    pub fn current_results_csv_string(&self) -> Result<String, CSVError> {
+        let mut wtr = CsvWriter::from_writer(vec![]);
+        wtr.write_record(&HEADERS)?;
         for (endpoint_type_name, results) in &self.endpoint_results {
-            let _ = wtr.write_record(&[
+            wtr.write_record(&[
                 &endpoint_type_name.0,
                 &endpoint_type_name.1,
                 &results.total_requests.to_string(),
@@ -184,9 +222,9 @@ impl AllResults {
                 &results.average_response_time.to_string(),
                 &results.min_response_time.to_string(),
                 &results.max_response_time.to_string(),
-            ]);
+            ])?;
         }
-        let _ = wtr.write_record(&[
+        wtr.write_record(&[
             AGR_TYPE_NAME[0],
             AGR_TYPE_NAME[1],
             &self.aggrigated_results.total_requests.to_string(),
@@ -201,9 +239,9 @@ impl AllResults {
             &self.aggrigated_results.average_response_time.to_string(),
             &self.aggrigated_results.min_response_time.to_string(),
             &self.aggrigated_results.max_response_time.to_string(),
-        ]);
-        let data = String::from_utf8(wtr.into_inner().unwrap()).unwrap();
-        data
+        ])?;
+        let data = String::from_utf8(wtr.into_inner()?)?;
+        Ok(data)
     }
 
     pub fn table_string(&self) -> String {

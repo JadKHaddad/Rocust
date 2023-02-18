@@ -6,6 +6,7 @@ pub mod tasks;
 pub mod test;
 pub mod traits;
 pub(crate) mod user;
+pub(crate) mod utils;
 pub(crate) mod writer;
 
 #[macro_export]

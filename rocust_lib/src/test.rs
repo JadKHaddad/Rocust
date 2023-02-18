@@ -5,6 +5,7 @@ use crate::{
     server::Server,
     traits::{HasTask, PrioritisedRandom, Shared, User},
     user::{UserInfo, UserPanicInfo},
+    utils::get_timestamp_as_millis_as_string,
     writer::Writer,
 };
 use rand::Rng;
@@ -108,16 +109,27 @@ impl Test {
                 Ok(writer) => {
                     // write header
                     let header = AllResults::history_header_csv_string();
-                    match writer.write_all(header.as_bytes()).await {
-                        Ok(_) => (),
+                    match header {
+                        Ok(header) => {
+                            match writer.write_all(header.as_bytes()).await {
+                                Ok(_) => (),
+                                Err(e) => {
+                                    tracing::error!(
+                                        "Failed to write header to results history file: [{}]",
+                                        e
+                                    );
+                                }
+                            }
+                            Some(writer)
+                        }
                         Err(e) => {
                             tracing::error!(
-                                "Failed to write header to results history file: [{}]",
+                                "Failed to create header for results history file: [{}]",
                                 e
                             );
+                            None
                         }
                     }
-                    Some(writer)
                 }
                 Err(e) => {
                     tracing::error!("Failed to create writer for results history file: [{}]", e);
@@ -312,26 +324,45 @@ impl Test {
                         // write current results to csv
                         if let Some(writer) = &current_results_writer {
                             let csv_string = all_results_gaurd.current_results_csv_string();
-                            match writer.write_all(csv_string.as_bytes()).await {
-                                Ok(_) => {}
+                            match csv_string {
+                                Ok(csv_string) => {
+                                    match writer.write_all(csv_string.as_bytes()).await {
+                                        Ok(_) => {}
+                                        Err(e) => {
+                                            tracing::error!("Error writing to csv: {}", e);
+                                        }
+                                    }
+                                }
                                 Err(e) => {
-                                    tracing::error!("Error writing to csv: {}", e);
+                                    tracing::error!("Error getting csv string: {}", e);
                                 }
                             }
                         }
 
-                        // write results history
+                        // write results history to csv
                         if let Some(writer) = &results_history_writer {
-                            // TODO: add timestamp
-                            let csv_string = all_results_gaurd.current_aggrigated_results_with_timestamp_csv_string("dummy timestamp");
-                            match writer.append_all(csv_string.as_bytes()).await {
-                                Ok(_) => {}
+                            match get_timestamp_as_millis_as_string() {
+                                Ok(timestamp) => {
+                                    let csv_string = all_results_gaurd.current_aggrigated_results_with_timestamp_csv_string(&timestamp);
+                                    match csv_string {
+                                        Ok(csv_string) => {
+                                            match writer.append_all(csv_string.as_bytes()).await {
+                                                Ok(_) => {}
+                                                Err(e) => {
+                                                    tracing::error!("Error writing to csv: {}", e);
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            tracing::error!("Error getting csv string: {}", e);
+                                        }
+                                    }
+                                }
                                 Err(e) => {
-                                    tracing::error!("Error writing to csv: {}", e);
+                                    tracing::error!("Error getting timestamp: {}", e);
                                 }
                             }
                         }
-
                     }
                 }
             }
