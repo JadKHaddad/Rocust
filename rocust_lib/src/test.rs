@@ -41,7 +41,7 @@ impl TestConfig {
 
 #[derive(Clone)]
 pub struct TestController {
-    token: Arc<CancellationToken>,
+    pub(crate) token: Arc<CancellationToken>,
     all_results_arc_rwlock: Arc<RwLock<AllResults>>,
 }
 
@@ -215,25 +215,14 @@ impl Test {
 
     fn strat_server(&self) -> JoinHandle<()> {
         let test_controller = self.get_controller().clone();
-        let token = self.token.clone();
         let addr = self.test_config.addr;
         tokio::spawn(async move {
             let server = Server::new(test_controller, addr);
             tracing::info!("Listening on {}", addr);
-            tokio::select! {
-                _ = server.run() => {
-                    // match result {
-                    //     Ok(_) => {
-
-                    //     }
-                    //     Err(e) => {
-                    //         tracing::error!("Server error: {}", e);
-                    //     }
-                    // }
-                }
-                _ = token.cancelled() => {
-                    tracing::info!("Server recieved signal and is shutting down");
-                }
+            // no tokio::select! here because axum is running with graceful shutdown
+            let res = server.run().await;
+            if let Err(e) = res {
+                tracing::error!("Server error: {}", e);
             }
         })
     }

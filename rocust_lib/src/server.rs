@@ -22,6 +22,7 @@ impl Server {
             .with_state(self.test_controller.clone());
         axum::Server::bind(&self.addr)
             .serve(app.into_make_service())
+            .with_graceful_shutdown(self.test_controller.token.cancelled())
             .await
     }
 }
