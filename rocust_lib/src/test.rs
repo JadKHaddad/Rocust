@@ -25,6 +25,7 @@ pub struct TestConfig {
     pub users_per_sec: u64,
     pub runtime: Option<u64>,
     pub update_interval_in_secs: u64,
+    pub print_to_stdout: bool,
     pub current_results_file: Option<String>,
     pub results_history_file: Option<String>,
     pub addr: Option<SocketAddr>,
@@ -36,6 +37,7 @@ impl TestConfig {
         users_per_sec: u64,
         runtime: Option<u64>,
         update_interval_in_secs: u64,
+        print_to_stdout: bool,
         current_results_file: Option<String>,
         results_history_file: Option<String>,
         addr: Option<SocketAddr>,
@@ -45,6 +47,7 @@ impl TestConfig {
             users_per_sec,
             runtime,
             update_interval_in_secs,
+            print_to_stdout,
             current_results_file,
             results_history_file,
             addr,
@@ -307,6 +310,7 @@ impl Test {
         let all_results_arc_rwlock = self.all_results_arc_rwlock.clone();
         let start_timestamp_arc_rwlock = self.start_timestamp_arc_rwlock.clone();
         let update_interval_in_secs = self.test_config.update_interval_in_secs;
+        let print_to_stdout = self.test_config.print_to_stdout;
         let current_results_writer = self.current_results_writer.clone();
         let results_history_writer = self.results_history_writer.clone();
         tokio::spawn(async move {
@@ -326,9 +330,11 @@ impl Test {
                         all_results_gaurd.calculate_per_second(&elapsed_time);
 
                         // print stats
-                        let table_string = all_results_gaurd.table_string();
-                        let mut stdout = io::stdout();
-                        let _ = stdout.write_all(table_string.as_bytes()).await;
+                        if print_to_stdout {
+                            let table_string = all_results_gaurd.table_string();
+                            let mut stdout = io::stdout();
+                            let _ = stdout.write_all(table_string.as_bytes()).await;
+                        }
 
                         // write current results to csv
                         if let Some(writer) = &current_results_writer {

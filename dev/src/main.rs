@@ -120,6 +120,7 @@ async fn main() {
         4,
         Some(60),
         2,
+        true,
         Some(String::from("results/current_results.csv")),
         Some(String::from("results/results_history.csv")),
         Some(SocketAddr::from(([127, 0, 0, 1], 3000))),
