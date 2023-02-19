@@ -36,7 +36,7 @@ struct MyUser {
 
 #[has_task(between = "(3, 5)", weight = 1, name = "GoogleTester")]
 impl MyUser {
-    #[task(priority = 1)]
+    #[task(priority = 5)]
     pub async fn index(&mut self, data: &Arc<Data>) {
         let start = std::time::Instant::now();
         let res = self.client.get("https://google.com").send().await;
@@ -66,7 +66,7 @@ impl MyUser {
         }
     }
 
-    #[task(priority = 1)]
+    #[task(priority = 5)]
     pub async fn none_existing_path(&mut self, data: &Arc<Data>) {
         let start = std::time::Instant::now();
         let res = self
@@ -98,6 +98,11 @@ impl MyUser {
                 );
             }
         }
+    }
+
+    #[task(priority = 1)]
+    async fn will_panic(&mut self, _data: &Arc<Data>) {
+        panic!("This task will panic");
     }
 }
 
@@ -142,6 +147,7 @@ async fn main() {
         Some(String::from("results/current_results.csv")),
         Some(String::from("results/results_history.csv")),
         Some(SocketAddr::from(([127, 0, 0, 1], 3000))),
+        // additional args, will be provided via CLI
         vec![],
         // stop condition: stop the test when total failures >= 30
         // stop condition will be checked at the end of each update phase (every {update_interval} seconds})

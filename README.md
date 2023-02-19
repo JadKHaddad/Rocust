@@ -22,6 +22,7 @@ cargo run -p dev
 - [ ] Web interface
 - [ ] Master/workers architecture
 - [ ] Other Features
+- [ ] TestConfig from CLI
 
 ## Contributors
 * Jad K. Haddad <jadkhaddad@gmail.com>
