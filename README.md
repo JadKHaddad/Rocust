@@ -8,3 +8,24 @@
 
 ## Status
 In development
+
+## Run the example
+Set up your ```test_config``` in ```dev/src/main.rs``` and run the following command:
+```sh
+cargo run -p dev
+```
+
+## TODO
+- [ ] Documentation
+- [ ] Examples
+- [ ] Tests
+- [ ] Web interface
+- [ ] Master/workers architecture
+- [ ] Other Features
+
+## Contributors
+* Jad K. Haddad <jadkhaddad@gmail.com>
+
+## License & copyright
+© 2023 Jad K. Haddad
+Licensed under the [MIT License](LICENSE)
