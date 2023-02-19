@@ -124,6 +124,17 @@ async fn main() {
         Some(String::from("results/current_results.csv")),
         Some(String::from("results/results_history.csv")),
         Some(SocketAddr::from(([127, 0, 0, 1], 3000))),
+        Some(|stop_condition_data| {
+            if stop_condition_data
+                .all_results
+                .get_aggrigated_results()
+                .total_requests
+                >= 10
+            {
+                return true;
+            }
+            false
+        }),
     );
     let test = Test::new(test_config).await;
     let test_controller = test.get_test_controller();
@@ -135,5 +146,5 @@ async fn main() {
 
     run!(test, MyUser).await;
 
-    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+    //tokio::time::sleep(std::time::Duration::from_secs(60)).await;
 }

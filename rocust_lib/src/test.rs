@@ -1,5 +1,5 @@
 use crate::{
-    data::Data,
+    data::{Data, StopConditionData},
     events::EventsHandler,
     messages::{MainMessage, ResultMessage, UserSpawnedMessage},
     results::AllResults,
@@ -29,6 +29,8 @@ pub struct TestConfig {
     pub current_results_file: Option<String>,
     pub results_history_file: Option<String>,
     pub addr: Option<SocketAddr>,
+    // a stop condiction will be checked at the end of every update interval and will stop the test if it returns true
+    pub stop_condition: Option<fn(StopConditionData) -> bool>,
 }
 
 impl TestConfig {
@@ -41,6 +43,7 @@ impl TestConfig {
         current_results_file: Option<String>,
         results_history_file: Option<String>,
         addr: Option<SocketAddr>,
+        stop_condition: Option<fn(StopConditionData) -> bool>,
     ) -> Self {
         TestConfig {
             user_count,
@@ -51,6 +54,7 @@ impl TestConfig {
             current_results_file,
             results_history_file,
             addr,
+            stop_condition,
         }
     }
 }
@@ -309,8 +313,7 @@ impl Test {
         let total_users_spawned_arc_rwlock = self.total_users_spawned_arc_rwlock.clone();
         let all_results_arc_rwlock = self.all_results_arc_rwlock.clone();
         let start_timestamp_arc_rwlock = self.start_timestamp_arc_rwlock.clone();
-        let update_interval_in_secs = self.test_config.update_interval_in_secs;
-        let print_to_stdout = self.test_config.print_to_stdout;
+        let test_config = self.test_config.clone();
         let current_results_writer = self.current_results_writer.clone();
         let results_history_writer = self.results_history_writer.clone();
         tokio::spawn(async move {
@@ -319,7 +322,7 @@ impl Test {
                     _ = token.cancelled() => {
                         break;
                     }
-                    _ = tokio::time::sleep(std::time::Duration::from_secs(update_interval_in_secs)) => {
+                    _ = tokio::time::sleep(std::time::Duration::from_secs(test_config.update_interval_in_secs)) => {
 
                         let total_users_spawned_gaurd = total_users_spawned_arc_rwlock.read().await;
                         tracing::info!("Total users spawned: [{}]", *total_users_spawned_gaurd);
@@ -330,7 +333,7 @@ impl Test {
                         all_results_gaurd.calculate_per_second(&elapsed_time);
 
                         // print stats
-                        if print_to_stdout {
+                        if test_config.print_to_stdout {
                             let table_string = all_results_gaurd.table_string();
                             let mut stdout = io::stdout();
                             let _ = stdout.write_all(table_string.as_bytes()).await;
@@ -376,6 +379,15 @@ impl Test {
                                 Err(e) => {
                                     tracing::error!("Error getting timestamp: {}", e);
                                 }
+                            }
+                        }
+
+                        // check stop condition and stop if needed
+                        if let Some(stop_condition) = &test_config.stop_condition {
+                            let stop_condition_data = StopConditionData::new(&*all_results_gaurd, &elapsed_time);
+                            if stop_condition(stop_condition_data) {
+                                tracing::info!("Stop condition met");
+                                token.cancel();
                             }
                         }
                     }

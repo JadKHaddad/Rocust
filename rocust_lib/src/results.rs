@@ -303,7 +303,11 @@ impl AllResults {
             .get(&EndpointTypeName(r#type.to_string(), name.to_string()))
     }
 
-    pub fn get_aggrigated(&self) -> &Results {
+    pub fn get_aggrigated_results(&self) -> &Results {
         &self.aggrigated_results
+    }
+
+    pub fn get_endpoint_results(&self) -> &HashMap<EndpointTypeName, Results> {
+        &self.endpoint_results
     }
 }
