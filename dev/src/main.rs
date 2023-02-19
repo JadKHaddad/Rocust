@@ -34,7 +34,7 @@ struct MyUser {
     shared: MyShared,
 }
 
-#[has_task(between = "(3, 5)", weight = 4, name = "RoCustUnstableUser")]
+#[has_task(between = "(3, 5)", weight = 1, name = "RoCustUnstableUser")]
 impl MyUser {
     #[task(priority = 5)]
     pub async fn foo(&mut self, data: &Arc<Data>) {
@@ -124,12 +124,13 @@ async fn main() {
         Some(String::from("results/current_results.csv")),
         Some(String::from("results/results_history.csv")),
         Some(SocketAddr::from(([127, 0, 0, 1], 3000))),
+        vec![],
         Some(|stop_condition_data| {
             if stop_condition_data
-                .all_results
+                .get_all_results()
                 .get_aggrigated_results()
-                .total_requests
-                >= 10
+                .get_total_requests()
+                >= &10
             {
                 return true;
             }
@@ -137,7 +138,7 @@ async fn main() {
         }),
     );
     let test = Test::new(test_config).await;
-    let test_controller = test.get_test_controller();
+    let test_controller = test.create_test_controller();
 
     tokio::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_secs(20)).await;

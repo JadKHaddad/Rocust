@@ -29,6 +29,7 @@ pub struct TestConfig {
     pub current_results_file: Option<String>,
     pub results_history_file: Option<String>,
     pub addr: Option<SocketAddr>,
+    pub args: Vec<String>,
     // a stop condiction will be checked at the end of every update interval and will stop the test if it returns true
     pub stop_condition: Option<fn(StopConditionData) -> bool>,
 }
@@ -43,6 +44,7 @@ impl TestConfig {
         current_results_file: Option<String>,
         results_history_file: Option<String>,
         addr: Option<SocketAddr>,
+        args: Vec<String>,
         stop_condition: Option<fn(StopConditionData) -> bool>,
     ) -> Self {
         TestConfig {
@@ -54,6 +56,7 @@ impl TestConfig {
             current_results_file,
             results_history_file,
             addr,
+            args,
             stop_condition,
         }
     }
@@ -157,7 +160,7 @@ impl Test {
         }
     }
 
-    pub fn get_test_controller(&self) -> TestController {
+    pub fn create_test_controller(&self) -> TestController {
         TestController::new(self.token.clone(), self.all_results_arc_rwlock.clone())
     }
 
@@ -287,7 +290,7 @@ impl Test {
     }
 
     fn strat_server(&self) -> JoinHandle<()> {
-        let test_controller = self.get_test_controller().clone();
+        let test_controller = self.create_test_controller().clone();
         let addr = self.test_config.addr;
         match addr {
             Some(addr) => {

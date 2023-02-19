@@ -17,7 +17,7 @@ macro_rules! run {
             let (results_tx, results_rx) = $test.before_spawn_users().await;
             let events_handler = EventsHandler::new(results_tx);
 
-            let data = rocust::rocust_lib::data::Data::new($test.get_test_controller(), $test.get_config().clone(), events_handler.clone());
+            let data = rocust::rocust_lib::data::Data::new($test.create_test_controller(), $test.get_config().clone(), events_handler.clone());
             let data_arc = std::sync::Arc::new(data);
 
             // get the shared data from the first user type

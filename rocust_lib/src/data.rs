@@ -30,8 +30,8 @@ impl Data {
 }
 
 pub struct StopConditionData<'a> {
-    pub all_results: &'a AllResults,
-    pub elapsed_time: &'a Duration,
+    all_results: &'a AllResults,
+    elapsed_time: &'a Duration,
 }
 
 impl<'a> StopConditionData<'a> {
@@ -40,5 +40,13 @@ impl<'a> StopConditionData<'a> {
             all_results,
             elapsed_time,
         }
+    }
+
+    pub fn get_all_results(&self) -> &AllResults {
+        self.all_results
+    }
+
+    pub fn get_elapsed_time(&self) -> &Duration {
+        self.elapsed_time
     }
 }

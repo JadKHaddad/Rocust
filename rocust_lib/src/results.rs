@@ -21,16 +21,16 @@ const AGR_TYPE_NAME: [&'static str; 2] = ["", "AGR"];
 
 #[derive(Debug, Default, Clone, Serialize)]
 pub struct Results {
-    pub total_requests: u32,
-    pub total_failed_requests: u32,
-    pub total_errors: u32,
-    pub total_response_time: f64,
-    pub average_response_time: f64,
-    pub min_response_time: f64,
-    pub median_response_time: f64,
-    pub max_response_time: f64,
-    pub requests_per_second: f64,
-    pub failed_requests_per_second: f64,
+    total_requests: u32,
+    total_failed_requests: u32,
+    total_errors: u32,
+    total_response_time: f64,
+    average_response_time: f64,
+    min_response_time: f64,
+    median_response_time: f64,
+    max_response_time: f64,
+    requests_per_second: f64,
+    failed_requests_per_second: f64,
 }
 
 impl Results {
@@ -70,6 +70,46 @@ impl Results {
     fn calculate_per_second(&mut self, elapsed: &Duration) {
         self.calculate_requests_per_second(elapsed);
         self.calculate_failed_requests_per_second(elapsed);
+    }
+
+    pub fn get_total_requests(&self) -> &u32 {
+        &self.total_requests
+    }
+
+    pub fn get_total_failed_requests(&self) -> &u32 {
+        &self.total_failed_requests
+    }
+
+    pub fn get_total_errors(&self) -> &u32 {
+        &self.total_errors
+    }
+
+    pub fn get_total_response_time(&self) -> &f64 {
+        &self.total_response_time
+    }
+
+    pub fn get_average_response_time(&self) -> &f64 {
+        &self.average_response_time
+    }
+
+    pub fn get_min_response_time(&self) -> &f64 {
+        &self.min_response_time
+    }
+
+    pub fn get_median_response_time(&self) -> &f64 {
+        &self.median_response_time
+    }
+
+    pub fn get_max_response_time(&self) -> &f64 {
+        &self.max_response_time
+    }
+
+    pub fn get_requests_per_second(&self) -> &f64 {
+        &self.requests_per_second
+    }
+
+    pub fn get_failed_requests_per_second(&self) -> &f64 {
+        &self.failed_requests_per_second
     }
 }
 
@@ -128,7 +168,7 @@ impl From<CsvIntoInnerError<CsvWriter<Vec<u8>>>> for CSVError {
 
 // TODO: refactor repeated code
 impl AllResults {
-    pub fn add_success(&mut self, endpoint_type_name: EndpointTypeName, response_time: f64) {
+    pub(crate) fn add_success(&mut self, endpoint_type_name: EndpointTypeName, response_time: f64) {
         self.aggrigated_results.add_success(response_time);
         if let Some(endpoint_results) = self.endpoint_results.get_mut(&endpoint_type_name) {
             endpoint_results.add_success(response_time);
@@ -140,7 +180,7 @@ impl AllResults {
         }
     }
 
-    pub fn add_failure(&mut self, endpoint_type_name: EndpointTypeName) {
+    pub(crate) fn add_failure(&mut self, endpoint_type_name: EndpointTypeName) {
         self.aggrigated_results.add_failure();
         if let Some(endpoint_results) = self.endpoint_results.get_mut(&endpoint_type_name) {
             endpoint_results.add_failure();
@@ -152,7 +192,7 @@ impl AllResults {
         }
     }
 
-    pub fn add_error(&mut self, endpoint_type_name: EndpointTypeName, _error: String) {
+    pub(crate) fn add_error(&mut self, endpoint_type_name: EndpointTypeName, _error: String) {
         self.aggrigated_results.add_error();
         if let Some(endpoint_results) = self.endpoint_results.get_mut(&endpoint_type_name) {
             endpoint_results.add_error();
@@ -164,14 +204,14 @@ impl AllResults {
         }
     }
 
-    pub fn calculate_per_second(&mut self, elapsed: &Duration) {
+    pub(crate) fn calculate_per_second(&mut self, elapsed: &Duration) {
         self.aggrigated_results.calculate_per_second(elapsed);
         for (_, endpoint_results) in self.endpoint_results.iter_mut() {
             endpoint_results.calculate_per_second(elapsed);
         }
     }
 
-    pub fn history_header_csv_string() -> Result<String, CSVError> {
+    pub(crate) fn history_header_csv_string() -> Result<String, CSVError> {
         let mut wtr = CsvWriter::from_writer(vec![]);
         let headers_with_timestamp = [&["TIMESTAMP"], &HEADERS[..]].concat();
         wtr.write_record(&headers_with_timestamp)?;
@@ -206,7 +246,7 @@ impl AllResults {
         Ok(data)
     }
 
-    pub fn current_results_csv_string(&self) -> Result<String, CSVError> {
+    pub(crate) fn current_results_csv_string(&self) -> Result<String, CSVError> {
         let mut wtr = CsvWriter::from_writer(vec![]);
         wtr.write_record(&HEADERS)?;
         for (endpoint_type_name, results) in &self.endpoint_results {
@@ -244,7 +284,7 @@ impl AllResults {
         Ok(data)
     }
 
-    pub fn table_string(&self) -> String {
+    pub(crate) fn table_string(&self) -> String {
         let mut table = Table::new();
         table.add_row(Row::new(HEADERS.iter().map(|s| Cell::new(s)).collect()));
         for (endpoint_type_name, results) in &self.endpoint_results {
