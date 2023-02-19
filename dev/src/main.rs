@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use reqwest::Client;
 use rocust::{
     rocust_lib::{
         data::Data,
@@ -13,6 +14,7 @@ use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use tracing_subscriber::EnvFilter;
 
+#[allow(dead_code)]
 #[derive(Clone)]
 struct MyShared {
     pub some_shared: Arc<RwLock<i32>>,
@@ -29,59 +31,91 @@ impl Shared for MyShared {
 
 struct MyUser {
     id: u64,
-
-    shared: MyShared,
+    client: Client,
 }
 
-#[has_task(between = "(3, 5)", weight = 1, name = "RoCustUnstableUser")]
+#[has_task(between = "(3, 5)", weight = 1, name = "GoogleTester")]
 impl MyUser {
-    #[task(priority = 5)]
-    pub async fn foo(&mut self, data: &Arc<Data>) {
-
-        data.events_handler
-            .add_success(String::from("GET"), String::from("/foo"), 0.1);
-    }
-
-    #[task(priority = 6)]
-    pub async fn bar(&mut self, data: &Arc<Data>) {
-
-        data.events_handler
-            .add_failure(String::from("GET"), String::from("/bar"));
-
-    }
-
-    #[task(priority = 9)]
-    pub async fn baz(&mut self, data: &Arc<Data>) {
-
-        data.events_handler.add_error(
-            String::from("GET"),
-            String::from("/baz"),
-            String::from("error"),
-        );
-
+    #[task(priority = 1)]
+    pub async fn index(&mut self, data: &Arc<Data>) {
+        let start = std::time::Instant::now();
+        let res = self.client.get("https://google.com").send().await;
+        let end = std::time::Instant::now();
+        match res {
+            Ok(res) => {
+                if res.status().is_success() {
+                    let duration = end.duration_since(start);
+                    let duration = duration.as_secs_f64();
+                    data.events_handler.add_success(
+                        String::from("GET"),
+                        String::from("/"),
+                        duration,
+                    );
+                } else {
+                    data.events_handler
+                        .add_failure(String::from("GET"), String::from("/"));
+                }
+            }
+            Err(_) => {
+                data.events_handler.add_error(
+                    String::from("GET"),
+                    String::from("/"),
+                    String::from("error"),
+                );
+            }
+        }
     }
 
     #[task(priority = 1)]
-    pub async fn panic(&mut self, _data: &Arc<Data>) {
-        panic!("panic");
+    pub async fn none_existing_path(&mut self, data: &Arc<Data>) {
+        let start = std::time::Instant::now();
+        let res = self
+            .client
+            .get("https://google.com/none_existing_path")
+            .send()
+            .await;
+        let end = std::time::Instant::now();
+        match res {
+            Ok(res) => {
+                if res.status().is_success() {
+                    let duration = end.duration_since(start);
+                    let duration = duration.as_secs_f64();
+                    data.events_handler.add_success(
+                        String::from("GET"),
+                        String::from("/none_existing_path"),
+                        duration,
+                    );
+                } else {
+                    data.events_handler
+                        .add_failure(String::from("GET"), String::from("/none_existing_path"));
+                }
+            }
+            Err(_) => {
+                data.events_handler.add_error(
+                    String::from("GET"),
+                    String::from("/none_existing_path"),
+                    String::from("error"),
+                );
+            }
+        }
     }
 }
 
 #[async_trait]
 impl User for MyUser {
-    type Shared = MyShared;
+    type Shared = ();
 
-    async fn new(id: u64, data: &Arc<Data>, shared: Self::Shared) -> Self {
-
-        MyUser { id, shared}
+    async fn new(id: u64, _data: &Arc<Data>, _shared: Self::Shared) -> Self {
+        let client = Client::new();
+        MyUser { id, client }
     }
 
     async fn on_start(&mut self, _: &Arc<Data>) {
-        println!("on_start: {}", self.id);
+        println!("User {} started", self.id);
     }
 
     async fn on_stop(&mut self, _: &Arc<Data>) {
-        println!("on_stop: {}", self.id);
+        println!("User {} stopped", self.id);
     }
 }
 
@@ -109,12 +143,14 @@ async fn main() {
         Some(String::from("results/results_history.csv")),
         Some(SocketAddr::from(([127, 0, 0, 1], 3000))),
         vec![],
+        // stop condition: stop the test when total failures >= 30
+        // stop condition will be checked at the end of each update phase (every {update_interval} seconds})
         Some(|stop_condition_data| {
             if stop_condition_data
                 .get_all_results()
                 .get_aggrigated_results()
-                .get_total_requests()
-                >= &10
+                .get_total_failed_requests()
+                >= &30
             {
                 return true;
             }
