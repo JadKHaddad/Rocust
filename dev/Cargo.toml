@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 rocust = {path = "../rocust"}
 tokio = {version="1.24.2", features=["full"]}
-console-subscriber = "0.1.8"
 tracing = "0.1.37"
 tracing-subscriber = "0.3.16"
 async-trait = "0.1.64"
+reqwest = "0.11.14"

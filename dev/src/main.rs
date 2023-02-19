@@ -28,9 +28,8 @@ impl Shared for MyShared {
 }
 
 struct MyUser {
-    a: i32,
-    b: i32,
     id: u64,
+
     shared: MyShared,
 }
 
@@ -38,36 +37,28 @@ struct MyUser {
 impl MyUser {
     #[task(priority = 5)]
     pub async fn foo(&mut self, data: &Arc<Data>) {
-        self.a += 1;
-        println!("{}: foo: {}", self.id, self.a);
+
         data.events_handler
             .add_success(String::from("GET"), String::from("/foo"), 0.1);
     }
 
     #[task(priority = 6)]
     pub async fn bar(&mut self, data: &Arc<Data>) {
-        self.b += 1;
-        println!("{} bar: {}", self.id, self.b);
+
         data.events_handler
             .add_failure(String::from("GET"), String::from("/bar"));
 
-        // count failures in shared state
-        let mut shared = self.shared.some_shared.write().await;
-        *shared += 1;
     }
 
     #[task(priority = 9)]
     pub async fn baz(&mut self, data: &Arc<Data>) {
-        println!("{} baz: {}", self.id, self.a + self.b);
+
         data.events_handler.add_error(
             String::from("GET"),
             String::from("/baz"),
             String::from("error"),
         );
 
-        // print shared state maybe?
-        let shared = self.shared.some_shared.read().await;
-        println!("shared: {}", *shared);
     }
 
     #[task(priority = 1)]
@@ -81,15 +72,8 @@ impl User for MyUser {
     type Shared = MyShared;
 
     async fn new(id: u64, data: &Arc<Data>, shared: Self::Shared) -> Self {
-        println!("MyUser Created!");
-        data.events_handler
-            .add_success(String::from("CREATE"), String::from(""), 0.0);
-        MyUser {
-            a: 0,
-            b: 0,
-            id,
-            shared,
-        }
+
+        MyUser { id, shared}
     }
 
     async fn on_start(&mut self, _: &Arc<Data>) {
