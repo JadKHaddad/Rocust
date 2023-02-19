@@ -2,6 +2,7 @@ use crate::test::TestController;
 use axum::{extract::State, response::IntoResponse, routing::get, Json, Router};
 use hyper::{Error as HyperError, StatusCode};
 use std::net::SocketAddr;
+
 pub struct Server {
     test_controller: TestController,
     addr: SocketAddr,

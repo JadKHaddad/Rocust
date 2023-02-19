@@ -1,4 +1,5 @@
 use crate::{
+    data::Data,
     events::EventsHandler,
     messages::{MainMessage, ResultMessage, UserSpawnedMessage},
     results::AllResults,
@@ -149,7 +150,7 @@ impl Test {
         }
     }
 
-    pub fn get_controller(&self) -> TestController {
+    pub fn get_test_controller(&self) -> TestController {
         TestController::new(self.token.clone(), self.all_results_arc_rwlock.clone())
     }
 
@@ -170,7 +171,7 @@ impl Test {
         &self,
         count: u64,
         starting_index: u64,
-        event_handler: EventsHandler,
+        data_arc: Arc<Data>,
         shared: S,
     ) -> JoinHandle<Vec<(JoinHandle<UserInfo>, UserPanicInfo)>>
     where
@@ -186,31 +187,20 @@ impl Test {
         let users_per_sec = self.test_config.users_per_sec;
         let token = self.token.clone();
         let user_count = count;
-        let test_config = self.test_config.clone();
-        let test_controller = self.get_controller();
         tokio::spawn(async move {
             let mut handles = vec![];
             let mut users_spawned = 0;
             for i in 0..user_count {
                 let id = i as u64 + starting_index;
-                let user_event_handler = event_handler.clone();
+                let user_data_arc = data_arc.clone();
                 let user_token = token.clone();
                 let spawn_token = user_token.clone();
                 let tasks = tasks.clone();
                 let shared = shared.clone();
-                let test_config = test_config.clone();
-                let test_controller = test_controller.clone();
                 let handle = tokio::spawn(async move {
-                    let mut user = T::new(
-                        id,
-                        test_config,
-                        test_controller,
-                        &user_event_handler,
-                        shared,
-                    )
-                    .await;
+                    let mut user = T::new(id, &user_data_arc, shared).await;
                     let mut total_tasks: u64 = 0;
-                    user.on_start(&user_event_handler).await;
+                    user.on_start(&user_data_arc).await;
                     loop {
                         // get a random task
                         if let Some(task) = tasks.get_proioritised_random() {
@@ -219,7 +209,7 @@ impl Test {
                                 // this is the sleep time of a user
                                 Test::sleep_between(between).await;
                                 // this is the actual task
-                                task.call(&mut user, &user_event_handler).await;
+                                task.call(&mut user, &user_data_arc).await;
                                 total_tasks += 1;
                             };
                             // do some sleep or stop
@@ -232,11 +222,12 @@ impl Test {
                             }
                         }
                     }
-                    user.on_stop(&user_event_handler).await;
+                    user.on_stop(&user_data_arc).await;
                     UserInfo::new(id, T::get_name(), total_tasks)
                 });
                 handles.push((handle, UserPanicInfo::new(id, T::get_name())));
-                let _ = event_handler
+                let _ = &data_arc
+                    .events_handler
                     .sender
                     .send(MainMessage::UserSpawned(UserSpawnedMessage {
                         id,
@@ -289,7 +280,7 @@ impl Test {
     }
 
     fn strat_server(&self) -> JoinHandle<()> {
-        let test_controller = self.get_controller().clone();
+        let test_controller = self.get_test_controller().clone();
         let addr = self.test_config.addr;
         match addr {
             Some(addr) => {

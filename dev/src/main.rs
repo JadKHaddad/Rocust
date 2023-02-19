@@ -1,9 +1,10 @@
 use async_trait::async_trait;
 use rocust::{
     rocust_lib::{
+        data::Data,
         events::EventsHandler,
         run,
-        test::{Test, TestConfig, TestController},
+        test::{Test, TestConfig},
         traits::{Shared, User},
     },
     rocust_macros::has_task,
@@ -36,17 +37,19 @@ struct MyUser {
 #[has_task(between = "(3, 5)", weight = 4, name = "RoCustUnstableUser")]
 impl MyUser {
     #[task(priority = 5)]
-    pub async fn foo(&mut self, handler: &EventsHandler) {
+    pub async fn foo(&mut self, data: &Arc<Data>) {
         self.a += 1;
         println!("{}: foo: {}", self.id, self.a);
-        handler.add_success(String::from("GET"), String::from("/foo"), 0.1);
+        data.events_handler
+            .add_success(String::from("GET"), String::from("/foo"), 0.1);
     }
 
     #[task(priority = 6)]
-    pub async fn bar(&mut self, handler: &EventsHandler) {
+    pub async fn bar(&mut self, data: &Arc<Data>) {
         self.b += 1;
         println!("{} bar: {}", self.id, self.b);
-        handler.add_failure(String::from("GET"), String::from("/bar"));
+        data.events_handler
+            .add_failure(String::from("GET"), String::from("/bar"));
 
         // count failures in shared state
         let mut shared = self.shared.some_shared.write().await;
@@ -54,9 +57,9 @@ impl MyUser {
     }
 
     #[task(priority = 9)]
-    pub async fn baz(&mut self, handler: &EventsHandler) {
+    pub async fn baz(&mut self, data: &Arc<Data>) {
         println!("{} baz: {}", self.id, self.a + self.b);
-        handler.add_error(
+        data.events_handler.add_error(
             String::from("GET"),
             String::from("/baz"),
             String::from("error"),
@@ -68,7 +71,7 @@ impl MyUser {
     }
 
     #[task(priority = 1)]
-    pub async fn panic(&mut self, _handler: &EventsHandler) {
+    pub async fn panic(&mut self, _data: &Arc<Data>) {
         panic!("panic");
     }
 }
@@ -77,15 +80,10 @@ impl MyUser {
 impl User for MyUser {
     type Shared = MyShared;
 
-    async fn new(
-        id: u64,
-        _test_config: TestConfig,
-        _test_controller: TestController,
-        handler: &EventsHandler,
-        shared: Self::Shared,
-    ) -> Self {
+    async fn new(id: u64, data: &Arc<Data>, shared: Self::Shared) -> Self {
         println!("MyUser Created!");
-        handler.add_success(String::from("CREATE"), String::from(""), 0.0);
+        data.events_handler
+            .add_success(String::from("CREATE"), String::from(""), 0.0);
         MyUser {
             a: 0,
             b: 0,
@@ -94,11 +92,11 @@ impl User for MyUser {
         }
     }
 
-    async fn on_start(&mut self, _: &EventsHandler) {
+    async fn on_start(&mut self, _: &Arc<Data>) {
         println!("on_start: {}", self.id);
     }
 
-    async fn on_stop(&mut self, _: &EventsHandler) {
+    async fn on_stop(&mut self, _: &Arc<Data>) {
         println!("on_stop: {}", self.id);
     }
 }
@@ -127,7 +125,7 @@ async fn main() {
         Some(SocketAddr::from(([127, 0, 0, 1], 3000))),
     );
     let test = Test::new(test_config).await;
-    let test_controller = test.get_controller();
+    let test_controller = test.get_test_controller();
 
     tokio::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_secs(20)).await;

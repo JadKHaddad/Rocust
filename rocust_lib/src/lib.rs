@@ -1,3 +1,4 @@
+pub mod data;
 pub mod events;
 pub(crate) mod messages;
 pub mod results;
@@ -15,6 +16,9 @@ macro_rules! run {
         {
             let (results_tx, results_rx) = $test.before_spawn_users().await;
             let events_handler = EventsHandler::new(results_tx);
+
+            let data = rocust::rocust_lib::data::Data::new($test.get_test_controller(), $test.get_config().clone(), events_handler.clone());
+            let data_arc = std::sync::Arc::new(data);
 
             // get the shared data from the first user type
             let shared = <$user_type as rocust::rocust_lib::traits::User>::Shared::new().await;
@@ -34,13 +38,13 @@ macro_rules! run {
             // how much to spawn and index interval as parameters
             let mut start_index = 0;
             let spawn_count = counts.get(&stringify!(<$user_type>)).expect("Unreachable Macro error!").clone();
-            let spawn_users_handles = $test.spawn_users::<$user_type, <$user_type as rocust::rocust_lib::traits::User>::Shared>(spawn_count,start_index, events_handler.clone(), shared.clone());
+            let spawn_users_handles = $test.spawn_users::<$user_type, <$user_type as rocust::rocust_lib::traits::User>::Shared>(spawn_count,start_index, data_arc.clone(), shared.clone());
             spawn_users_handles_vec.push(spawn_users_handles);
             start_index += spawn_count;
 
             $(
                 let spawn_count = counts.get(&stringify!(<$user_types>)).expect("Unreachable Macro error!").clone();
-                let spawn_users_handles = $test.spawn_users::<$user_types, <$user_types as rocust::rocust_lib::traits::User>::Shared>(spawn_count,start_index,events_handler.clone(), shared.clone());
+                let spawn_users_handles = $test.spawn_users::<$user_types, <$user_types as rocust::rocust_lib::traits::User>::Shared>(spawn_count,start_index, data_arc.clone(), shared.clone());
                 spawn_users_handles_vec.push(spawn_users_handles);
                 start_index += spawn_count;
             )*

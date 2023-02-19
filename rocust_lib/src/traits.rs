@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-
+use std::sync::Arc;
 pub trait HasTask {
     fn get_async_tasks() -> Vec<crate::tasks::AsyncTask<Self>>
     where
@@ -24,16 +24,9 @@ pub trait HasTask {
 pub trait User: Send + Sized {
     type Shared: Shared;
 
-    // TODO: maybe ARC?
-    async fn new(
-        _id: u64,
-        _test_config: TestConfig,
-        _test_controller: TestController,
-        _handler: &EventsHandler,
-        _shared: Self::Shared,
-    ) -> Self;
-    async fn on_start(&mut self, _handler: &EventsHandler) {}
-    async fn on_stop(&mut self, _handler: &EventsHandler) {}
+    async fn new(_id: u64, _data: &Arc<Data>, _shared: Self::Shared) -> Self;
+    async fn on_start(&mut self, _data: &Arc<Data>) {}
+    async fn on_stop(&mut self, _data: &Arc<Data>) {}
 }
 
 #[async_trait]
@@ -54,10 +47,8 @@ where
 
 use rand::{distributions::WeightedIndex, prelude::Distribution};
 
-use crate::{
-    events::EventsHandler,
-    test::{TestConfig, TestController},
-};
+use crate::data::Data;
+
 impl<T> PrioritisedRandom<T> for Vec<T>
 where
     T: Prioritised,
