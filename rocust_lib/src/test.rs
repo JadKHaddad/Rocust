@@ -4,13 +4,14 @@ use crate::{
     messages::{MainMessage, ResultMessage, UserSpawnedMessage},
     results::AllResults,
     server::Server,
+    test_config::TestConfig,
     traits::{HasTask, PrioritisedRandom, Shared, User},
     user::{UserInfo, UserPanicInfo},
     utils::get_timestamp_as_millis_as_string,
     writer::Writer,
 };
 use rand::Rng;
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 use tokio::{
     io::{self, AsyncWriteExt},
     sync::{mpsc, RwLock},
@@ -18,49 +19,6 @@ use tokio::{
     time::Instant,
 };
 use tokio_util::sync::CancellationToken;
-
-#[derive(Clone)]
-pub struct TestConfig {
-    pub user_count: u64,
-    pub users_per_sec: u64,
-    pub runtime: Option<u64>,
-    pub update_interval_in_secs: u64,
-    pub print_to_stdout: bool,
-    pub current_results_file: Option<String>,
-    pub results_history_file: Option<String>,
-    pub addr: Option<SocketAddr>,
-    pub args: Vec<String>,
-    // a stop condiction will be checked at the end of every update interval and will stop the test if it returns true
-    pub stop_condition: Option<fn(StopConditionData) -> bool>,
-}
-
-impl TestConfig {
-    pub fn new(
-        user_count: u64,
-        users_per_sec: u64,
-        runtime: Option<u64>,
-        update_interval_in_secs: u64,
-        print_to_stdout: bool,
-        current_results_file: Option<String>,
-        results_history_file: Option<String>,
-        addr: Option<SocketAddr>,
-        args: Vec<String>,
-        stop_condition: Option<fn(StopConditionData) -> bool>,
-    ) -> Self {
-        TestConfig {
-            user_count,
-            users_per_sec,
-            runtime,
-            update_interval_in_secs,
-            print_to_stdout,
-            current_results_file,
-            results_history_file,
-            addr,
-            args,
-            stop_condition,
-        }
-    }
-}
 
 #[derive(Clone)]
 pub struct TestController {
@@ -291,7 +249,7 @@ impl Test {
 
     fn strat_server(&self) -> JoinHandle<()> {
         let test_controller = self.create_test_controller().clone();
-        let addr = self.test_config.addr;
+        let addr = self.test_config.server_address;
         match addr {
             Some(addr) => {
                 tracing::info!("Server listening on [{}]", addr);

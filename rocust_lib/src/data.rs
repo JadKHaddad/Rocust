@@ -1,7 +1,5 @@
 use crate::{
-    events::EventsHandler,
-    results::AllResults,
-    test::{TestConfig, TestController},
+    events::EventsHandler, results::AllResults, test::TestController, test_config::TestConfig,
 };
 use std::time::Duration;
 

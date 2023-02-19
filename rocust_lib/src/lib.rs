@@ -1,4 +1,3 @@
-pub mod cli;
 pub mod data;
 pub mod events;
 pub(crate) mod messages;
@@ -6,6 +5,7 @@ pub mod results;
 pub(crate) mod server;
 pub mod tasks;
 pub mod test;
+pub mod test_config;
 pub mod traits;
 pub(crate) mod user;
 pub(crate) mod utils;
