@@ -1,3 +1,4 @@
+pub mod cli;
 pub mod data;
 pub mod events;
 pub(crate) mod messages;

@@ -16,13 +16,18 @@ cargo run -p dev
 ```
 
 ## TODO
+- [X] TestConfig from CLI
+- [ ] TestConfig from file: TOML, YAML, JSON
+- [ ] Stop condition parser to create a stop condition from a string
 - [ ] Documentation
 - [ ] Examples
 - [ ] Tests
 - [ ] Web interface
 - [ ] Master/workers architecture
 - [ ] Other Features
-- [ ] TestConfig from CLI
+
+## Rust version 
+1.67.1
 
 ## Contributors
 * Jad K. Haddad <jadkhaddad@gmail.com>

@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use reqwest::Client;
 use rocust::{
     rocust_lib::{
+        cli::TestConfig as CliTestConfig,
         data::Data,
         events::EventsHandler,
         run,
@@ -163,6 +164,10 @@ async fn main() {
             false
         }),
     );
+
+    // or get test config from CLI. server_address, stop_condition and additional_args will be ignored for now (will be implemented later)
+    // let test_config: TestConfig = CliTestConfig::new().into();
+
     let test = Test::new(test_config).await;
     let test_controller = test.create_test_controller();
 

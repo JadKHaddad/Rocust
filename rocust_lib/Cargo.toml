@@ -17,3 +17,4 @@ csv = "1.2.0"
 axum = "0.6.7"
 hyper = "0.14.24"
 async-trait = "0.1.64"
+clap = {version="4.1.6", features = ["derive"]}
