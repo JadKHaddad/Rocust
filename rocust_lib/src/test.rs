@@ -1,7 +1,7 @@
 use crate::{
     data::{Data, StopConditionData},
     events::EventsHandler,
-    messages::{MainMessage, ResultMessage, UserSpawnedMessage},
+    messages::{MainMessage, ResultMessage},
     results::AllResults,
     server::Server,
     test_config::TestConfig,
@@ -22,19 +22,12 @@ use tokio_util::sync::CancellationToken;
 
 #[derive(Clone)]
 pub struct TestController {
-    pub(crate) token: Arc<CancellationToken>,
-    all_results_arc_rwlock: Arc<RwLock<AllResults>>,
+    token: Arc<CancellationToken>,
 }
 
 impl TestController {
-    pub fn new(
-        token: Arc<CancellationToken>,
-        all_results_arc_rwlock: Arc<RwLock<AllResults>>,
-    ) -> Self {
-        TestController {
-            token,
-            all_results_arc_rwlock,
-        }
+    pub fn new(token: Arc<CancellationToken>) -> Self {
+        TestController { token }
     }
 
     pub fn stop(&self) {
@@ -42,8 +35,8 @@ impl TestController {
         self.token.cancel();
     }
 
-    pub async fn get_results(&self) -> AllResults {
-        self.all_results_arc_rwlock.read().await.clone()
+    pub(crate) async fn cancelled(&self) {
+        self.token.cancelled().await
     }
 }
 
@@ -119,7 +112,7 @@ impl Test {
     }
 
     pub fn create_test_controller(&self) -> TestController {
-        TestController::new(self.token.clone(), self.all_results_arc_rwlock.clone())
+        TestController::new(self.token.clone())
     }
 
     pub fn get_config(&self) -> &TestConfig {
@@ -194,13 +187,7 @@ impl Test {
                     UserInfo::new(id, T::get_name(), total_tasks)
                 });
                 handles.push((handle, UserPanicInfo::new(id, T::get_name())));
-                let _ = &data_arc
-                    .events_handler
-                    .sender
-                    .send(MainMessage::UserSpawned(UserSpawnedMessage {
-                        id,
-                        name: T::get_name(),
-                    }));
+                data_arc.events_handler.add_user_spawned(id, T::get_name());
                 users_spawned += 1;
                 if users_spawned % users_per_sec == 0 {
                     tokio::select! {
@@ -248,13 +235,14 @@ impl Test {
     }
 
     fn strat_server(&self) -> JoinHandle<()> {
-        let test_controller = self.create_test_controller().clone();
+        let test_controller = self.create_test_controller();
+        let all_results_arc_rwlock = self.all_results_arc_rwlock.clone();
         let addr = self.test_config.server_address;
         match addr {
             Some(addr) => {
                 tracing::info!("Server listening on [{}]", addr);
                 tokio::spawn(async move {
-                    let server = Server::new(test_controller, addr);
+                    let server = Server::new(test_controller, all_results_arc_rwlock, addr);
                     // no tokio::select! here because axum is running with graceful shutdown
                     let res = server.run().await;
                     if let Err(e) = res {

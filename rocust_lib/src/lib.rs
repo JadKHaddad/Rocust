@@ -14,7 +14,7 @@ pub(crate) mod writer;
 #[macro_export]
 macro_rules! run {
     ($test:ident, $user_type:ty $(,$user_types:ty)*) => {
-        {
+        async {
             let (results_tx, results_rx) = $test.before_spawn_users().await;
             let events_handler = EventsHandler::new(results_tx);
 
@@ -51,7 +51,7 @@ macro_rules! run {
             )*
 
             drop(shared);
-            $test.after_spawn_users(events_handler, results_rx, spawn_users_handles_vec)
+            $test.after_spawn_users(events_handler, results_rx, spawn_users_handles_vec).await;
         }
     };
 }

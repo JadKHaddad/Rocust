@@ -8,7 +8,7 @@ pub struct Data {
     pub test_config: TestConfig,
     pub events_handler: EventsHandler,
     // why is AllResults not included here?
-    // well, because it is behind an RwLock, wich is only accessed in two main tasks
+    // well, because it is behind an RwLock, wich is only accessed in 3 main tasks (test server, test main loop, test background loop)
     // we don't want the ~1000 users to accuire a lock on it with on every single task
     // the user could track his own results in his internal state or use the shared object accross all users
 }

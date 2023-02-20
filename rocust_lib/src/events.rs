@@ -1,6 +1,7 @@
 use crate::{
     messages::{
         ErrorResultMessage, FailureResultMessage, MainMessage, ResultMessage, SuccessResultMessage,
+        UserSpawnedMessage,
     },
     results::EndpointTypeName,
 };
@@ -8,7 +9,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 #[derive(Debug, Clone)]
 pub struct EventsHandler {
-    pub(crate) sender: UnboundedSender<MainMessage>,
+    sender: UnboundedSender<MainMessage>,
 }
 
 impl EventsHandler {
@@ -46,5 +47,11 @@ impl EventsHandler {
                     error,
                 },
             )));
+    }
+
+    pub(crate) fn add_user_spawned(&self, id: u64, name: String) {
+        let _ = self
+            .sender
+            .send(MainMessage::UserSpawned(UserSpawnedMessage { id, name }));
     }
 }
