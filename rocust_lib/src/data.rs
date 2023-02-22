@@ -1,6 +1,5 @@
 use crate::{
-    events::EventsHandler, results::AllResults, test::TestController, test_config::TestConfig,
-    user::UserController,
+    events::EventsHandler, results::AllResults, test::TestController, user::UserController,
 };
 use std::{sync::Arc, time::Duration};
 
@@ -10,11 +9,8 @@ pub struct Data {
     // arc because it is shared between all users
     test_controller: Arc<TestController>,
 
-    // arc because it is shared between all users
-    test_config: Arc<TestConfig>,
-
-    // arc because it is shared between all users
-    events_handler: Arc<EventsHandler>,
+    // not shared between users
+    events_handler: EventsHandler,
 
     // not shared between users
     user_controller: UserController,
@@ -27,13 +23,11 @@ pub struct Data {
 impl Data {
     pub fn new(
         test_controller: Arc<TestController>,
-        test_config: Arc<TestConfig>,
-        events_handler: Arc<EventsHandler>,
+        events_handler: EventsHandler,
         user_controller: UserController,
     ) -> Self {
         Self {
             test_controller,
-            test_config,
             events_handler,
             user_controller,
         }
@@ -43,11 +37,7 @@ impl Data {
         &self.test_controller
     }
 
-    pub fn get_test_config(&self) -> &Arc<TestConfig> {
-        &self.test_config
-    }
-
-    pub fn get_events_handler(&self) -> &Arc<EventsHandler> {
+    pub fn get_events_handler(&self) -> &EventsHandler {
         &self.events_handler
     }
 

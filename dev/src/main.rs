@@ -3,7 +3,6 @@ use reqwest::Client;
 use rocust::{
     rocust_lib::{
         data::Data,
-        events::EventsHandler,
         run,
         test::Test,
         test_config::TestConfig,
@@ -116,9 +115,12 @@ impl MyUser {
 impl User for MyUser {
     type Shared = ();
 
-    async fn new(id: u64, _data: &Data, _shared: Self::Shared) -> Self {
+    async fn new(_test_config: &TestConfig, data: &Data, _shared: Self::Shared) -> Self {
         let client = Client::new();
-        MyUser { id, client }
+        MyUser {
+            id: data.get_events_handler().get_id(),
+            client,
+        }
     }
 
     async fn on_start(&mut self, _: &Data) {
@@ -147,7 +149,7 @@ async fn main() {
     let test_config = TestConfig::new(
         20,
         10,
-        Some(60),
+        Some(10),
         2,
         true,
         Some(String::from("results/current_results.csv")),
@@ -162,7 +164,7 @@ async fn main() {
                 .get_all_results()
                 .get_aggrigated_results()
                 .get_total_failed_requests()
-                >= &30
+                >= &200
             {
                 return true;
             }

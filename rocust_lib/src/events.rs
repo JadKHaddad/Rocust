@@ -9,12 +9,13 @@ use tokio::sync::mpsc::UnboundedSender;
 
 #[derive(Debug, Clone)]
 pub struct EventsHandler {
+    id: u64,
     sender: UnboundedSender<MainMessage>,
 }
 
 impl EventsHandler {
-    pub fn new(sender: UnboundedSender<MainMessage>) -> Self {
-        Self { sender }
+    pub fn new(id: u64, sender: UnboundedSender<MainMessage>) -> Self {
+        Self { id, sender }
     }
 
     pub fn add_success(&self, r#type: String, name: String, response_time: f64) {
@@ -22,6 +23,7 @@ impl EventsHandler {
             .sender
             .send(MainMessage::ResultMessage(ResultMessage::Success(
                 SuccessResultMessage {
+                    user_id: self.id,
                     endpoint_type_name: EndpointTypeName(r#type, name),
                     response_time,
                 },
@@ -33,6 +35,7 @@ impl EventsHandler {
             .sender
             .send(MainMessage::ResultMessage(ResultMessage::Failure(
                 FailureResultMessage {
+                    user_id: self.id,
                     endpoint_type_name: EndpointTypeName(r#type, name),
                 },
             )));
@@ -43,6 +46,7 @@ impl EventsHandler {
             .sender
             .send(MainMessage::ResultMessage(ResultMessage::Error(
                 ErrorResultMessage {
+                    user_id: self.id,
                     endpoint_type_name: EndpointTypeName(r#type, name),
                     error,
                 },
@@ -53,5 +57,9 @@ impl EventsHandler {
         let _ = self
             .sender
             .send(MainMessage::UserSpawned(UserSpawnedMessage { id, name }));
+    }
+
+    pub fn get_id(&self) -> u64 {
+        self.id
     }
 }

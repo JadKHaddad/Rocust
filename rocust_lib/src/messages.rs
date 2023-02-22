@@ -6,8 +6,8 @@ pub enum MainMessage {
 }
 
 pub struct UserSpawnedMessage {
-    pub id: u64,
-    pub name: String,
+    pub(crate) id: u64,
+    pub(crate) name: String,
 }
 
 pub enum ResultMessage {
@@ -17,15 +17,18 @@ pub enum ResultMessage {
 }
 
 pub struct SuccessResultMessage {
-    pub endpoint_type_name: EndpointTypeName,
-    pub response_time: f64,
+    pub(crate) user_id: u64,
+    pub(crate) endpoint_type_name: EndpointTypeName,
+    pub(crate) response_time: f64,
 }
 
 pub struct FailureResultMessage {
-    pub endpoint_type_name: EndpointTypeName,
+    pub(crate) user_id: u64,
+    pub(crate) endpoint_type_name: EndpointTypeName,
 }
 
 pub struct ErrorResultMessage {
-    pub endpoint_type_name: EndpointTypeName,
-    pub error: String,
+    pub(crate) user_id: u64,
+    pub(crate) endpoint_type_name: EndpointTypeName,
+    pub(crate) error: String,
 }

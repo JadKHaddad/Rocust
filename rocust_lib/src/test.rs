@@ -11,7 +11,7 @@ use crate::{
     writer::Writer,
 };
 use rand::Rng;
-use std::{sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::{
     io::{self, AsyncWriteExt},
     sync::{mpsc, RwLock},
@@ -47,6 +47,7 @@ pub struct Test {
     results_history_writer: Option<Writer>,
     total_users_spawned_arc_rwlock: Arc<RwLock<u64>>,
     all_results_arc_rwlock: Arc<RwLock<AllResults>>,
+    users_results_arc_rwlock: Arc<RwLock<HashMap<u64, AllResults>>>,
     start_timestamp_arc_rwlock: Arc<RwLock<Instant>>,
 }
 
@@ -107,6 +108,7 @@ impl Test {
             results_history_writer,
             total_users_spawned_arc_rwlock: Arc::new(RwLock::new(0)),
             all_results_arc_rwlock: Arc::new(RwLock::new(AllResults::default())),
+            users_results_arc_rwlock: Arc::new(RwLock::new(HashMap::new())),
             start_timestamp_arc_rwlock: Arc::new(RwLock::new(Instant::now())),
         }
     }
@@ -132,9 +134,8 @@ impl Test {
         &self,
         count: u64,
         starting_index: u64,
-        events_handler: Arc<EventsHandler>,
+        results_tx: mpsc::UnboundedSender<MainMessage>,
         test_controller: Arc<TestController>,
-        test_config: Arc<TestConfig>,
         shared: S,
     ) -> JoinHandle<Vec<(JoinHandle<UserInfo>, UserPanicInfo)>>
     where
@@ -147,50 +148,57 @@ impl Test {
             return tokio::spawn(async move { vec![] }); // just to avoid an infinite loop
         }
         let between = T::get_between();
-        let users_per_sec = self.test_config.users_per_sec;
-        let token = self.token.clone();
-        let user_count = count;
 
+        let token = self.token.clone();
+
+        let test_config = self.test_config.clone();
+        let users_per_sec = test_config.users_per_sec;
         tokio::spawn(async move {
             let mut handles = vec![];
             let mut users_spawned = 0;
-            for i in 0..user_count {
+            for i in 0..count {
+                let test_config = test_config.clone();
                 let id = i as u64 + starting_index;
 
                 // these are the tokens for the test
                 let test_token_for_user = token.clone();
                 let test_spawn_token = token.clone();
 
-                // create a user token got the UserController
+                // create a user token for the UserController
                 let user_token = Arc::new(CancellationToken::new());
                 let user_spawn_token = user_token.clone();
                 let user_controller = UserController::new(id.clone(), user_token.clone());
+                let events_handler = EventsHandler::new(id.clone(), results_tx.clone());
+
                 // create the data for the user
                 let user_data = Data::new(
                     test_controller.clone(),
-                    test_config.clone(),
                     events_handler.clone(),
                     user_controller,
                 );
 
                 let tasks = tasks.clone();
                 let shared = shared.clone();
+
                 let handle = tokio::spawn(async move {
-                    let mut user = T::new(id, &user_data, shared).await;
+                    let mut user = T::new(&test_config, &user_data, shared).await;
                     let mut total_tasks: u64 = 0;
                     user.on_start(&user_data).await;
+
                     loop {
                         // get a random task
                         if let Some(task) = tasks.get_proioritised_random() {
-                            // call it
+                            // call it, do some sleep
                             let task_call_and_sleep = async {
                                 // this is the sleep time of a user
                                 Test::sleep_between(between).await;
+
                                 // this is the actual task
                                 task.call(&mut user, &user_data).await;
+
                                 total_tasks += 1;
                             };
-                            // do some sleep or stop
+
                             tokio::select! {
                                 _ = user_token.cancelled() => {
                                     tracing::info!("User [{}][{}] attempted suicide", T::get_name(), id);
@@ -204,6 +212,7 @@ impl Test {
                             }
                         }
                     }
+
                     user.on_stop(&user_data).await;
                     UserInfo::new(id, T::get_name(), total_tasks)
                 });
@@ -283,6 +292,7 @@ impl Test {
     }
 
     fn start_background_tasks(&self) -> JoinHandle<()> {
+        // note: not updating stats for every user, only for the whole test. user stats are only updated once when summery is created
         let token = self.token.clone();
         let total_users_spawned_arc_rwlock = self.total_users_spawned_arc_rwlock.clone();
         let all_results_arc_rwlock = self.all_results_arc_rwlock.clone();
@@ -302,6 +312,7 @@ impl Test {
                         tracing::info!("Total users spawned: [{}]", *total_users_spawned_gaurd);
 
                         let mut all_results_gaurd = all_results_arc_rwlock.write().await;
+
                         // update stats
                         let elapsed_time = Test::calculate_elapsed_time(&*start_timestamp_arc_rwlock.read().await);
                         all_results_gaurd.calculate_per_second(&elapsed_time);
@@ -375,28 +386,59 @@ impl Test {
             match msg {
                 MainMessage::ResultMessage(result_msg) => {
                     let mut all_results_gaurd = self.all_results_arc_rwlock.write().await;
+                    let mut users_results_gaurd = self.users_results_arc_rwlock.write().await;
                     match result_msg {
                         ResultMessage::Success(sucess_result_msg) => {
                             all_results_gaurd.add_success(
-                                sucess_result_msg.endpoint_type_name,
+                                &sucess_result_msg.endpoint_type_name,
                                 sucess_result_msg.response_time,
                             );
+                            // updating user results
+                            if let Some(user_all_results) =
+                                users_results_gaurd.get_mut(&sucess_result_msg.user_id)
+                            {
+                                user_all_results.add_success(
+                                    &sucess_result_msg.endpoint_type_name,
+                                    sucess_result_msg.response_time,
+                                );
+                            }
                         }
                         ResultMessage::Failure(failure_result_msg) => {
-                            all_results_gaurd.add_failure(failure_result_msg.endpoint_type_name);
+                            all_results_gaurd.add_failure(&failure_result_msg.endpoint_type_name);
+
+                            // updating user results
+                            if let Some(user_all_results) =
+                                users_results_gaurd.get_mut(&failure_result_msg.user_id)
+                            {
+                                user_all_results
+                                    .add_failure(&failure_result_msg.endpoint_type_name);
+                            }
                         }
                         ResultMessage::Error(error_result_msg) => {
                             all_results_gaurd.add_error(
-                                error_result_msg.endpoint_type_name,
-                                error_result_msg.error,
+                                &error_result_msg.endpoint_type_name,
+                                &error_result_msg.error,
                             );
+
+                            // updating user results
+                            if let Some(user_all_results) =
+                                users_results_gaurd.get_mut(&error_result_msg.user_id)
+                            {
+                                user_all_results.add_error(
+                                    &error_result_msg.endpoint_type_name,
+                                    &error_result_msg.error,
+                                );
+                            }
                         }
                     }
                 }
-                MainMessage::UserSpawned(_) => {
+                MainMessage::UserSpawned(user_spawned_msg) => {
                     let mut total_users_spawned_gaurd =
                         self.total_users_spawned_arc_rwlock.write().await;
                     *total_users_spawned_gaurd += 1;
+
+                    let mut users_results_gaurd = self.users_results_arc_rwlock.write().await;
+                    users_results_gaurd.insert(user_spawned_msg.id, AllResults::default());
                 }
             }
         }
@@ -489,6 +531,17 @@ impl Test {
         tracing::debug!("Timer finished");
 
         tracing::info!("Test finished");
+
+        // TODO: remove dev
+        // Dev: print all results of all users. but lets do a quick update of the results
+        let elapsed_time =
+            Test::calculate_elapsed_time(&*self.start_timestamp_arc_rwlock.read().await);
+        for (user_id, user_results) in self.users_results_arc_rwlock.write().await.iter_mut() {
+            user_results.calculate_per_second(&elapsed_time);
+            println!("User [{}]", user_id);
+            println!("{:#?}", user_results);
+            println!("--------------------------------");
+        }
     }
 }
 

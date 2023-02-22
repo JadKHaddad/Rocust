@@ -168,7 +168,11 @@ impl From<CsvIntoInnerError<CsvWriter<Vec<u8>>>> for CSVError {
 
 // TODO: refactor repeated code
 impl AllResults {
-    pub(crate) fn add_success(&mut self, endpoint_type_name: EndpointTypeName, response_time: f64) {
+    pub(crate) fn add_success(
+        &mut self,
+        endpoint_type_name: &EndpointTypeName,
+        response_time: f64,
+    ) {
         self.aggrigated_results.add_success(response_time);
         if let Some(endpoint_results) = self.endpoint_results.get_mut(&endpoint_type_name) {
             endpoint_results.add_success(response_time);
@@ -176,11 +180,11 @@ impl AllResults {
             let mut endpoint_results = Results::default();
             endpoint_results.add_success(response_time);
             self.endpoint_results
-                .insert(endpoint_type_name, endpoint_results);
+                .insert(endpoint_type_name.clone(), endpoint_results);
         }
     }
 
-    pub(crate) fn add_failure(&mut self, endpoint_type_name: EndpointTypeName) {
+    pub(crate) fn add_failure(&mut self, endpoint_type_name: &EndpointTypeName) {
         self.aggrigated_results.add_failure();
         if let Some(endpoint_results) = self.endpoint_results.get_mut(&endpoint_type_name) {
             endpoint_results.add_failure();
@@ -188,11 +192,11 @@ impl AllResults {
             let mut endpoint_results = Results::default();
             endpoint_results.add_failure();
             self.endpoint_results
-                .insert(endpoint_type_name, endpoint_results);
+                .insert(endpoint_type_name.clone(), endpoint_results);
         }
     }
 
-    pub(crate) fn add_error(&mut self, endpoint_type_name: EndpointTypeName, _error: String) {
+    pub(crate) fn add_error(&mut self, endpoint_type_name: &EndpointTypeName, _error: &String) {
         self.aggrigated_results.add_error();
         if let Some(endpoint_results) = self.endpoint_results.get_mut(&endpoint_type_name) {
             endpoint_results.add_error();
@@ -200,7 +204,7 @@ impl AllResults {
             let mut endpoint_results = Results::default();
             endpoint_results.add_error();
             self.endpoint_results
-                .insert(endpoint_type_name, endpoint_results);
+                .insert(endpoint_type_name.clone(), endpoint_results);
         }
     }
 
