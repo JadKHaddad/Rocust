@@ -1,12 +1,23 @@
 use crate::{
     events::EventsHandler, results::AllResults, test::TestController, test_config::TestConfig,
+    user::UserController,
 };
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 pub struct Data {
-    pub test_controller: TestController,
-    pub test_config: TestConfig,
-    pub events_handler: EventsHandler,
+    // each user will recieve a Data obj containing
+
+    // arc because it is shared between all users
+    test_controller: Arc<TestController>,
+
+    // arc because it is shared between all users
+    test_config: Arc<TestConfig>,
+
+    // arc because it is shared between all users
+    events_handler: Arc<EventsHandler>,
+
+    // not shared between users
+    user_controller: UserController,
     // why is AllResults not included here?
     // well, because it is behind an RwLock, wich is only accessed in 3 main tasks (test server, test main loop, test background loop)
     // we don't want the ~1000 users to accuire a lock on it with on every single task
@@ -15,15 +26,33 @@ pub struct Data {
 
 impl Data {
     pub fn new(
-        test_controller: TestController,
-        test_config: TestConfig,
-        events_handler: EventsHandler,
+        test_controller: Arc<TestController>,
+        test_config: Arc<TestConfig>,
+        events_handler: Arc<EventsHandler>,
+        user_controller: UserController,
     ) -> Self {
         Self {
             test_controller,
             test_config,
             events_handler,
+            user_controller,
         }
+    }
+
+    pub fn get_test_controller(&self) -> &Arc<TestController> {
+        &self.test_controller
+    }
+
+    pub fn get_test_config(&self) -> &Arc<TestConfig> {
+        &self.test_config
+    }
+
+    pub fn get_events_handler(&self) -> &Arc<EventsHandler> {
+        &self.events_handler
+    }
+
+    pub fn get_user_controller(&self) -> &UserController {
+        &self.user_controller
     }
 }
 

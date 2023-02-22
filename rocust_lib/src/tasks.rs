@@ -1,5 +1,5 @@
 use crate::{data::Data, traits::Prioritised};
-use std::{future::Future, pin::Pin, sync::Arc};
+use std::{future::Future, pin::Pin};
 
 #[derive(Clone)]
 pub struct AsyncTask<T>
@@ -7,13 +7,13 @@ where
     T: 'static,
 {
     priority: u64,
-    func: for<'a> fn(&'a mut T, &'a Arc<Data>) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>>,
+    func: for<'a> fn(&'a mut T, &'a Data) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>>,
 }
 
 impl<T> AsyncTask<T> {
     pub fn new(
         priority: u64,
-        func: for<'a> fn(&'a mut T, &'a Arc<Data>) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>>,
+        func: for<'a> fn(&'a mut T, &'a Data) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>>,
     ) -> Self {
         AsyncTask { priority, func }
     }
@@ -22,7 +22,7 @@ impl<T> AsyncTask<T> {
         self.priority
     }
 
-    pub async fn call(&self, user: &mut T, data: &Arc<Data>) {
+    pub async fn call(&self, user: &mut T, data: &Data) {
         (self.func)(user, data).await;
     }
 }

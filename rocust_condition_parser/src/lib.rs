@@ -9,8 +9,6 @@ pub fn test() {
         Expr::If(_) => {
             println!("if");
         }
-        _ => {
-           
-        }
+        _ => {}
     }
 }

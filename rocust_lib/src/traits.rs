@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use std::sync::Arc;
+
 pub trait HasTask {
     fn get_async_tasks() -> Vec<crate::tasks::AsyncTask<Self>>
     where
@@ -24,9 +24,9 @@ pub trait HasTask {
 pub trait User: Send + Sized {
     type Shared: Shared;
 
-    async fn new(_id: u64, _data: &Arc<Data>, _shared: Self::Shared) -> Self;
-    async fn on_start(&mut self, _data: &Arc<Data>) {}
-    async fn on_stop(&mut self, _data: &Arc<Data>) {}
+    async fn new(_id: u64, _data: &Data, _shared: Self::Shared) -> Self;
+    async fn on_start(&mut self, _data: &Data) {}
+    async fn on_stop(&mut self, _data: &Data) {}
 }
 
 #[async_trait]

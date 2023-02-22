@@ -16,10 +16,11 @@ macro_rules! run {
     ($test:ident, $user_type:ty $(,$user_types:ty)*) => {
         async {
             let (results_tx, results_rx) = $test.before_spawn_users().await;
-            let events_handler = EventsHandler::new(results_tx);
 
-            let data = rocust::rocust_lib::data::Data::new($test.create_test_controller(), $test.get_config().clone(), events_handler.clone());
-            let data_arc = std::sync::Arc::new(data);
+            // create the shared data for the Data struct for each user
+            let events_handler = std::sync::Arc::new(EventsHandler::new(results_tx));
+            let test_controller = std::sync::Arc::new($test.create_test_controller());
+            let test_config = std::sync::Arc::new($test.get_config().clone());
 
             // get the shared data from the first user type
             let shared = <$user_type as rocust::rocust_lib::traits::User>::Shared::new().await;
@@ -39,19 +40,25 @@ macro_rules! run {
             // how much to spawn and index interval as parameters
             let mut start_index = 0;
             let spawn_count = counts.get(&stringify!(<$user_type>)).expect("Unreachable Macro error!").clone();
-            let spawn_users_handles = $test.spawn_users::<$user_type, <$user_type as rocust::rocust_lib::traits::User>::Shared>(spawn_count,start_index, data_arc.clone(), shared.clone());
+            let spawn_users_handles = $test.spawn_users::<$user_type, <$user_type as rocust::rocust_lib::traits::User>::Shared>(spawn_count, start_index, events_handler.clone(), test_controller.clone(), test_config.clone(), shared.clone());
             spawn_users_handles_vec.push(spawn_users_handles);
             start_index += spawn_count;
 
             $(
                 let spawn_count = counts.get(&stringify!(<$user_types>)).expect("Unreachable Macro error!").clone();
-                let spawn_users_handles = $test.spawn_users::<$user_types, <$user_types as rocust::rocust_lib::traits::User>::Shared>(spawn_count,start_index, data_arc.clone(), shared.clone());
+                let spawn_users_handles = $test.spawn_users::<$user_types, <$user_types as rocust::rocust_lib::traits::User>::Shared>(spawn_count, start_index, events_handler.clone(), test_controller.clone(), test_config.clone(), shared.clone());
                 spawn_users_handles_vec.push(spawn_users_handles);
                 start_index += spawn_count;
             )*
 
+            // drop because why not >:D
             drop(shared);
-            $test.after_spawn_users(events_handler, results_rx, spawn_users_handles_vec).await;
+            drop(test_controller);
+            drop(test_config);
+
+            // drop the events_handler to drop the sender
+            drop(events_handler);
+            $test.after_spawn_users(results_rx, spawn_users_handles_vec).await;
         }
     };
 }

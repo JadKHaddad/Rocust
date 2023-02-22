@@ -37,8 +37,8 @@ struct MyUser {
 
 #[has_task(between = "(3, 5)", weight = 1, name = "GoogleTester")]
 impl MyUser {
-    #[task(priority = 5)]
-    pub async fn index(&mut self, data: &Arc<Data>) {
+    #[task(priority = 20)]
+    pub async fn index(&mut self, data: &Data) {
         let start = std::time::Instant::now();
         let res = self.client.get("https://google.com").send().await;
         let end = std::time::Instant::now();
@@ -47,18 +47,18 @@ impl MyUser {
                 if res.status().is_success() {
                     let duration = end.duration_since(start);
                     let duration = duration.as_secs_f64();
-                    data.events_handler.add_success(
+                    data.get_events_handler().add_success(
                         String::from("GET"),
                         String::from("/"),
                         duration,
                     );
                 } else {
-                    data.events_handler
+                    data.get_events_handler()
                         .add_failure(String::from("GET"), String::from("/"));
                 }
             }
             Err(_) => {
-                data.events_handler.add_error(
+                data.get_events_handler().add_error(
                     String::from("GET"),
                     String::from("/"),
                     String::from("error"),
@@ -67,8 +67,8 @@ impl MyUser {
         }
     }
 
-    #[task(priority = 5)]
-    pub async fn none_existing_path(&mut self, data: &Arc<Data>) {
+    #[task(priority = 20)]
+    pub async fn none_existing_path(&mut self, data: &Data) {
         let start = std::time::Instant::now();
         let res = self
             .client
@@ -81,18 +81,18 @@ impl MyUser {
                 if res.status().is_success() {
                     let duration = end.duration_since(start);
                     let duration = duration.as_secs_f64();
-                    data.events_handler.add_success(
+                    data.get_events_handler().add_success(
                         String::from("GET"),
                         String::from("/none_existing_path"),
                         duration,
                     );
                 } else {
-                    data.events_handler
+                    data.get_events_handler()
                         .add_failure(String::from("GET"), String::from("/none_existing_path"));
                 }
             }
             Err(_) => {
-                data.events_handler.add_error(
+                data.get_events_handler().add_error(
                     String::from("GET"),
                     String::from("/none_existing_path"),
                     String::from("error"),
@@ -102,8 +102,13 @@ impl MyUser {
     }
 
     #[task(priority = 1)]
-    async fn will_panic(&mut self, _data: &Arc<Data>) {
+    async fn will_panic(&mut self, _data: &Data) {
         panic!("This task will panic");
+    }
+
+    #[task(priority = 10)]
+    async fn suicide(&mut self, data: &Data) {
+        data.get_user_controller().stop();
     }
 }
 
@@ -111,16 +116,16 @@ impl MyUser {
 impl User for MyUser {
     type Shared = ();
 
-    async fn new(id: u64, _data: &Arc<Data>, _shared: Self::Shared) -> Self {
+    async fn new(id: u64, _data: &Data, _shared: Self::Shared) -> Self {
         let client = Client::new();
         MyUser { id, client }
     }
 
-    async fn on_start(&mut self, _: &Arc<Data>) {
+    async fn on_start(&mut self, _: &Data) {
         println!("User {} started", self.id);
     }
 
-    async fn on_stop(&mut self, _: &Arc<Data>) {
+    async fn on_stop(&mut self, _: &Data) {
         println!("User {} stopped", self.id);
     }
 }
@@ -130,7 +135,7 @@ async fn main() {
     // export RUSTFLAGS="--cfg tokio_unstable"
     // export RUST_LOG="debug"
     // $Env:RUSTFLAGS="--cfg tokio_unstable"
-    // $Env:RUST_LOG="debug"
+    // $Env:RUST_LOG="info"
     // console_subscriber::init();
 
     let subscriber = tracing_subscriber::fmt()
@@ -140,8 +145,8 @@ async fn main() {
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let test_config = TestConfig::new(
-        50,
-        4,
+        20,
+        10,
         Some(60),
         2,
         true,
@@ -172,7 +177,7 @@ async fn main() {
     let test_controller = test.create_test_controller();
 
     tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(20)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(100)).await;
         test_controller.stop();
     });
 

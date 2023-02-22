@@ -123,7 +123,7 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
 
     let methods = methods.iter().map(|(method_name, priority)| {
         quote! {
-            fn #method_name<'a>(u: &'a mut #struct_name, data: &'a std::sync::Arc<rocust::rocust_lib::data::Data>) -> ::core::pin::Pin<Box<dyn ::core::future::Future<Output = ()> + ::core::marker::Send + 'a>> {
+            fn #method_name<'a>(u: &'a mut #struct_name, data: &'a rocust::rocust_lib::data::Data) -> ::core::pin::Pin<Box<dyn ::core::future::Future<Output = ()> + ::core::marker::Send + 'a>> {
                 Box::pin(async move {
                     u.#method_name(data).await;
                 })

@@ -6,7 +6,7 @@ use crate::{
     server::Server,
     test_config::TestConfig,
     traits::{HasTask, PrioritisedRandom, Shared, User},
-    user::{UserInfo, UserPanicInfo},
+    user::{UserController, UserInfo, UserPanicInfo},
     utils::get_timestamp_as_millis_as_string,
     writer::Writer,
 };
@@ -132,7 +132,9 @@ impl Test {
         &self,
         count: u64,
         starting_index: u64,
-        data_arc: Arc<Data>,
+        events_handler: Arc<EventsHandler>,
+        test_controller: Arc<TestController>,
+        test_config: Arc<TestConfig>,
         shared: S,
     ) -> JoinHandle<Vec<(JoinHandle<UserInfo>, UserPanicInfo)>>
     where
@@ -148,20 +150,35 @@ impl Test {
         let users_per_sec = self.test_config.users_per_sec;
         let token = self.token.clone();
         let user_count = count;
+
         tokio::spawn(async move {
             let mut handles = vec![];
             let mut users_spawned = 0;
             for i in 0..user_count {
                 let id = i as u64 + starting_index;
-                let user_data_arc = data_arc.clone();
-                let user_token = token.clone();
-                let spawn_token = user_token.clone();
+
+                // these are the tokens for the test
+                let test_token_for_user = token.clone();
+                let test_spawn_token = token.clone();
+
+                // create a user token got the UserController
+                let user_token = Arc::new(CancellationToken::new());
+                let user_spawn_token = user_token.clone();
+                let user_controller = UserController::new(id.clone(), user_token.clone());
+                // create the data for the user
+                let user_data = Data::new(
+                    test_controller.clone(),
+                    test_config.clone(),
+                    events_handler.clone(),
+                    user_controller,
+                );
+
                 let tasks = tasks.clone();
                 let shared = shared.clone();
                 let handle = tokio::spawn(async move {
-                    let mut user = T::new(id, &user_data_arc, shared).await;
+                    let mut user = T::new(id, &user_data, shared).await;
                     let mut total_tasks: u64 = 0;
-                    user.on_start(&user_data_arc).await;
+                    user.on_start(&user_data).await;
                     loop {
                         // get a random task
                         if let Some(task) = tasks.get_proioritised_random() {
@@ -170,12 +187,16 @@ impl Test {
                                 // this is the sleep time of a user
                                 Test::sleep_between(between).await;
                                 // this is the actual task
-                                task.call(&mut user, &user_data_arc).await;
+                                task.call(&mut user, &user_data).await;
                                 total_tasks += 1;
                             };
                             // do some sleep or stop
                             tokio::select! {
                                 _ = user_token.cancelled() => {
+                                    tracing::info!("User [{}][{}] attempted suicide", T::get_name(), id);
+                                    break;
+                                }
+                                _ = test_token_for_user.cancelled() => {
                                     break;
                                 }
                                 _ = task_call_and_sleep => {
@@ -183,15 +204,19 @@ impl Test {
                             }
                         }
                     }
-                    user.on_stop(&user_data_arc).await;
+                    user.on_stop(&user_data).await;
                     UserInfo::new(id, T::get_name(), total_tasks)
                 });
                 handles.push((handle, UserPanicInfo::new(id, T::get_name())));
-                data_arc.events_handler.add_user_spawned(id, T::get_name());
+                events_handler.add_user_spawned(id, T::get_name());
                 users_spawned += 1;
                 if users_spawned % users_per_sec == 0 {
                     tokio::select! {
-                        _ = spawn_token.cancelled() => {
+                        _ = user_spawn_token.cancelled() => {
+                            tracing::info!("User [{}][{}] attempted suicide", T::get_name(), id);
+                            break;
+                        }
+                        _ = test_spawn_token.cancelled() => {
                             break;
                         }
                         _ = tokio::time::sleep(std::time::Duration::from_secs(1)) => {
@@ -390,7 +415,6 @@ impl Test {
 
     pub async fn after_spawn_users(
         &self,
-        events_handler: EventsHandler,
         results_rx: mpsc::UnboundedReceiver<MainMessage>,
         spawn_users_handles_vec: Vec<JoinHandle<Vec<(JoinHandle<UserInfo>, UserPanicInfo)>>>,
     ) {
@@ -402,9 +426,6 @@ impl Test {
 
         // start the background tasks in another task (calculating stats, printing stats, managing files)
         let background_tasks_handle = self.start_background_tasks();
-
-        // drop the events_handler to drop the sender
-        drop(events_handler);
 
         // start the reciever
         self.block_on_reciever(results_rx).await;
