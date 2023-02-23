@@ -1,7 +1,8 @@
 use csv::{Error as CsvError, IntoInnerError as CsvIntoInnerError, Writer as CsvWriter};
 use prettytable::{row, Cell, Row, Table};
 use serde::Serialize;
-use std::{collections::HashMap, fmt::Display, string::FromUtf8Error, time::Duration};
+use std::{collections::HashMap, string::FromUtf8Error, time::Duration};
+use thiserror::Error as ThisError;
 
 const HEADERS: [&'static str; 11] = [
     "TYPE",
@@ -132,38 +133,14 @@ pub struct AllResults {
     endpoint_results: HashMap<EndpointTypeName, Results>,
 }
 
+#[derive(Debug, ThisError)]
 pub enum CSVError {
-    FromUtf8Error(FromUtf8Error),
-    CsvError(CsvError),
-    IntoInnerError(CsvIntoInnerError<CsvWriter<Vec<u8>>>),
-}
-
-impl Display for CSVError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CSVError::FromUtf8Error(error) => write!(f, "FromUtf8Error: {}", error),
-            CSVError::CsvError(error) => write!(f, "CsvError: {}", error),
-            CSVError::IntoInnerError(error) => write!(f, "IntoInnerError: {}", error),
-        }
-    }
-}
-
-impl From<FromUtf8Error> for CSVError {
-    fn from(error: FromUtf8Error) -> Self {
-        CSVError::FromUtf8Error(error)
-    }
-}
-
-impl From<CsvError> for CSVError {
-    fn from(error: CsvError) -> Self {
-        CSVError::CsvError(error)
-    }
-}
-
-impl From<CsvIntoInnerError<CsvWriter<Vec<u8>>>> for CSVError {
-    fn from(error: CsvIntoInnerError<CsvWriter<Vec<u8>>>) -> Self {
-        CSVError::IntoInnerError(error)
-    }
+    #[error("FromUtf8Error error: {0}")]
+    FromUtf8Error(#[from] FromUtf8Error),
+    #[error("CsvError error: {0}")]
+    CsvError(#[from] CsvError),
+    #[error("IntoInnerError error: {0}")]
+    IntoInnerError(#[from] CsvIntoInnerError<CsvWriter<Vec<u8>>>),
 }
 
 // TODO: refactor repeated code

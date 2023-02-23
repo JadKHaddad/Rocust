@@ -1,7 +1,4 @@
-use std::{
-    io::{Error as StdIoError},
-    path::PathBuf,
-};
+use std::{io::Error as StdIoError, path::PathBuf};
 use thiserror::Error as ThisError;
 use tokio::{
     fs::{create_dir_all, File},
@@ -24,10 +21,17 @@ impl Reader {
         Self::new(PathBuf::from(path)).await
     }
 
-    pub async fn read_all(&self) -> Result<Vec<u8>, ReadError> {
+    pub async fn _read_all(&self) -> Result<Vec<u8>, ReadError> {
         let mut file = File::open(&self.path).await?;
         let mut data = Vec::new();
         file.read_to_end(&mut data).await?;
+        Ok(data)
+    }
+
+    pub async fn read_all_to_string(&self) -> Result<String, ReadError> {
+        let mut file = File::open(&self.path).await?;
+        let mut data = String::new();
+        file.read_to_string(&mut data).await?;
         Ok(data)
     }
 }

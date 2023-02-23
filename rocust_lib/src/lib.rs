@@ -1,6 +1,7 @@
 pub mod data;
 pub mod events;
 pub(crate) mod messages;
+pub(crate) mod reader;
 pub mod results;
 pub(crate) mod server;
 pub mod tasks;
@@ -10,7 +11,6 @@ pub mod traits;
 pub(crate) mod user;
 pub(crate) mod utils;
 pub(crate) mod writer;
-pub(crate) mod reader;
 
 #[macro_export]
 macro_rules! run {
