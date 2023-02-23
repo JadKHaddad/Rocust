@@ -19,6 +19,7 @@ use tokio::{
     time::Instant,
 };
 use tokio_util::sync::CancellationToken;
+use tracing_subscriber::EnvFilter;
 
 #[derive(Clone)]
 pub struct TestController {
@@ -128,6 +129,17 @@ impl Test {
     async fn sleep_between(between: (u64, u64)) {
         let between = rand::thread_rng().gen_range(between.0..between.1);
         tokio::time::sleep(Duration::from_secs(between)).await;
+    }
+
+    pub fn setup_logging(&self) {
+        // TODO: get log level from config
+        let subscriber = tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::from_env("ROCUST_LOG"))
+            .compact()
+            .finish();
+        if let Err(_) = tracing::subscriber::set_global_default(subscriber) {
+            tracing::warn!("Failed to set global default subscriber");
+        }
     }
 
     pub fn spawn_users<T, S>(

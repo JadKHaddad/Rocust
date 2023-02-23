@@ -12,7 +12,6 @@ use rocust::{
 };
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
-use tracing_subscriber::EnvFilter;
 
 #[allow(dead_code)]
 #[derive(Clone)]
@@ -34,7 +33,7 @@ struct MyUser {
     client: Client,
 }
 
-#[has_task(between = "(3, 5)", weight = 1, name = "GoogleTester")]
+#[has_task(between = "(3, 5)", weight = 1)]
 impl MyUser {
     #[task(priority = 20)]
     pub async fn index(&mut self, data: &Data) {
@@ -135,16 +134,10 @@ impl User for MyUser {
 #[tokio::main]
 async fn main() {
     // export RUSTFLAGS="--cfg tokio_unstable"
-    // export RUST_LOG="debug"
+    // export ROCUST_LOG="debug"
     // $Env:RUSTFLAGS="--cfg tokio_unstable"
-    // $Env:RUST_LOG="info"
+    // $Env:ROCUST_LOG="info"
     // console_subscriber::init();
-
-    let subscriber = tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .compact()
-        .finish();
-    tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let test_config = TestConfig::new(
         20,

@@ -15,6 +15,9 @@ pub(crate) mod writer;
 macro_rules! run {
     ($test:ident, $user_type:ty $(,$user_types:ty)*) => {
         async {
+            // set up the logger
+            $test.setup_logging();
+
             let (results_tx, results_rx) = $test.before_spawn_users().await;
 
             // create the shared data for the Data struct for each user

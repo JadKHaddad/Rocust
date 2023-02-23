@@ -9,7 +9,7 @@ pub trait HasTask {
     }
 
     fn get_name() -> String {
-        String::from("unnamed")
+        String::new()
     }
 
     fn get_between() -> (u64, u64) {
