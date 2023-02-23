@@ -10,6 +10,7 @@ pub mod traits;
 pub(crate) mod user;
 pub(crate) mod utils;
 pub(crate) mod writer;
+pub(crate) mod reader;
 
 #[macro_export]
 macro_rules! run {

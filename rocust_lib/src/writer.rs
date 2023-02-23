@@ -1,7 +1,8 @@
-use std::{io::Result as StdIoResult, path::PathBuf};
+use std::{io::Error as StdIoError, path::PathBuf};
+use thiserror::Error as ThisError;
 use tokio::{
     fs::{create_dir_all, File, OpenOptions},
-    io::{self as TokoiIo, AsyncWriteExt},
+    io::{AsyncWriteExt, Error as TokioIoError},
 };
 
 #[derive(Clone)]
@@ -10,24 +11,24 @@ pub struct Writer {
 }
 
 impl Writer {
-    async fn new(path: PathBuf) -> StdIoResult<Self> {
+    async fn new(path: PathBuf) -> Result<Self, CreateError> {
         if let Some(parent) = path.parent() {
             create_dir_all(parent).await?;
         }
         Ok(Writer { path })
     }
 
-    pub async fn from_str(path: &str) -> StdIoResult<Self> {
+    pub async fn from_str(path: &str) -> Result<Self, CreateError> {
         Self::new(PathBuf::from(path)).await
     }
 
-    pub async fn write_all(&self, data: &[u8]) -> TokoiIo::Result<()> {
+    pub async fn write_all(&self, data: &[u8]) -> Result<(), WriteError> {
         let mut file = File::create(&self.path).await?;
         file.write_all(data).await?;
         Ok(())
     }
 
-    pub async fn append_all(&self, data: &[u8]) -> TokoiIo::Result<()> {
+    pub async fn append_all(&self, data: &[u8]) -> Result<(), WriteError> {
         let mut file = OpenOptions::new()
             .write(true)
             .append(true)
@@ -36,4 +37,24 @@ impl Writer {
         file.write_all(data).await?;
         Ok(())
     }
+}
+
+#[derive(Debug, ThisError)]
+pub enum WriteError {
+    #[error("Write error: {0}")]
+    Write(#[from] TokioIoError),
+}
+
+#[derive(Debug, ThisError)]
+pub enum CreateError {
+    #[error("Create error: {0}")]
+    Create(#[from] StdIoError),
+}
+
+#[derive(Debug, ThisError)]
+pub enum WriterError {
+    #[error("Create error: {0}")]
+    Create(#[from] CreateError),
+    #[error("Write error: {0}")]
+    Write(#[from] WriteError),
 }
