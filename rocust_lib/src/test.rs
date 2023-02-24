@@ -134,8 +134,8 @@ impl Test {
         tokio::time::sleep(Duration::from_secs(between)).await;
     }
 
-    // TODO: this is a bit of a mess, clean it up
-    // TODO: check geven logfile
+    // TODO: this is a bit of a mess, clean it up. A perfect example of "make it work for now and forget to clean it up later"
+    // TODO: check given logfile
     // TODO: check if print to stdout
     pub fn setup_logging(&self) -> WorkerGuard {
         let file_appender = tracing_appender::rolling::never("results", "prefix.log");
