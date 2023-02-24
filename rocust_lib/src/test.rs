@@ -19,7 +19,7 @@ use tokio::{
     time::Instant,
 };
 use tokio_util::sync::CancellationToken;
-use tracing_subscriber::EnvFilter;
+use tracing_subscriber::{filter::EnvFilter, FmtSubscriber};
 
 #[derive(Clone)]
 pub struct TestController {
@@ -131,14 +131,29 @@ impl Test {
         tokio::time::sleep(Duration::from_secs(between)).await;
     }
 
+    // TODO: this is a bit of a mess, clean it up
     pub fn setup_logging(&self) {
-        // TODO: get log level from config
-        let subscriber = tracing_subscriber::fmt()
-            .with_env_filter(EnvFilter::from_env("ROCUST_LOG"))
-            .compact()
-            .finish();
-        if let Err(_) = tracing::subscriber::set_global_default(subscriber) {
-            tracing::warn!("Failed to set global default subscriber");
+        match self.test_config.log_level {
+            Some(log_level) => {
+                let subscriber = FmtSubscriber::builder()
+                    .with_max_level(log_level)
+                    .compact()
+                    .finish();
+
+                if let Err(_) = tracing::subscriber::set_global_default(subscriber) {
+                    tracing::warn!("Failed to set global default subscriber");
+                }
+            }
+            None => {
+                let subscriber = FmtSubscriber::builder()
+                    .with_env_filter(EnvFilter::from_env("ROCUST_LOG"))
+                    .compact()
+                    .finish();
+
+                if let Err(_) = tracing::subscriber::set_global_default(subscriber) {
+                    tracing::warn!("Failed to set global default subscriber");
+                }
+            }
         }
     }
 

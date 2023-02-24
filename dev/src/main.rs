@@ -163,6 +163,7 @@ async fn main() {
         Some(10),
         2,
         true,
+        Some(tracing::level_filters::LevelFilter::INFO),
         Some(String::from("results/current_results.csv")),
         Some(String::from("results/results_history.csv")),
         Some(SocketAddr::from(([127, 0, 0, 1], 3000))),
@@ -184,8 +185,8 @@ async fn main() {
     );
 
     // or get test config from CLI. server_address, stop_condition and additional_args will be ignored for now (will be implemented later)
-    // cargo run -p dev -- --user-count 4 --users-per-sec 4 --runtime 60 --update-interval-in-secs 3 --no-print-to-stdout --current-results-file "results/current_results.csv" --results-history-file "results/results_history.csv" --server-address "127.0.0.1:8080" --additional-arg "arg1" --additional-arg "arg2"
-    // let test_config = TestConfig::from_cli_args().expect("Failed to get test config from CLI args");
+    // cargo run -p dev -- --user-count 20 --users-per-sec 4 --runtime 60 --update-interval-in-secs 3 --log-level "debug" --current-results-file "results/current_results.csv" --results-history-file "results/results_history.csv" --server-address "127.0.0.1:8080" --additional-arg "arg1" --additional-arg "arg2"
+    //let test_config = TestConfig::from_cli_args().expect("Failed to get test config from CLI args");
 
     let test = Test::new(test_config).await;
     let test_controller = test.create_test_controller();

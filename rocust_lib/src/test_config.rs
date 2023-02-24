@@ -9,6 +9,20 @@ use serde_yaml::{self, Error as SerdeYamlError};
 use std::net::{AddrParseError, SocketAddr};
 use thiserror::Error as ThisError;
 use toml::de::Error as TomlDeError;
+use tracing::level_filters::LevelFilter;
+
+fn parse_log_level(log_level: &str) -> Result<LevelFilter, LogLevelError> {
+    let log_level = log_level.to_lowercase();
+    match log_level.as_str() {
+        "trace" => Ok(LevelFilter::TRACE),
+        "debug" => Ok(LevelFilter::DEBUG),
+        "info" => Ok(LevelFilter::INFO),
+        "warn" => Ok(LevelFilter::WARN),
+        "error" => Ok(LevelFilter::ERROR),
+        "off" => Ok(LevelFilter::OFF),
+        _ => Err(LogLevelError::InvalidLogLevel(log_level.to_string())),
+    }
+}
 
 #[derive(Clone)]
 pub struct TestConfig {
@@ -17,6 +31,7 @@ pub struct TestConfig {
     pub runtime: Option<u64>,
     pub update_interval_in_secs: u64,
     pub print_to_stdout: bool,
+    pub log_level: Option<LevelFilter>,
     pub current_results_file: Option<String>,
     pub results_history_file: Option<String>,
     pub server_address: Option<SocketAddr>,
@@ -32,6 +47,7 @@ impl TestConfig {
         runtime: Option<u64>,
         update_interval_in_secs: u64,
         print_to_stdout: bool,
+        log_level: Option<LevelFilter>,
         current_results_file: Option<String>,
         results_history_file: Option<String>,
         server_address: Option<SocketAddr>,
@@ -44,6 +60,7 @@ impl TestConfig {
             runtime,
             update_interval_in_secs,
             print_to_stdout,
+            log_level,
             current_results_file,
             results_history_file,
             server_address,
@@ -109,6 +126,11 @@ impl TryFrom<ExternalTestConfig> for TestConfig {
     type Error = FromExternalTestConfigError;
 
     fn try_from(external_test_config: ExternalTestConfig) -> Result<Self, Self::Error> {
+        let log_level = if let Some(log_level) = external_test_config.log_level {
+            Some(parse_log_level(&log_level)?)
+        } else {
+            None
+        };
         let server_address: Option<SocketAddr> =
             if let Some(server_address) = external_test_config.server_address {
                 Some(server_address.parse()?)
@@ -121,6 +143,7 @@ impl TryFrom<ExternalTestConfig> for TestConfig {
             runtime: external_test_config.runtime,
             update_interval_in_secs: external_test_config.update_interval_in_secs,
             print_to_stdout: !external_test_config.no_print_to_stdout,
+            log_level,
             current_results_file: external_test_config.current_results_file,
             results_history_file: external_test_config.results_history_file,
             server_address,
@@ -154,6 +177,10 @@ struct ExternalTestConfig {
     #[arg(long)]
     no_print_to_stdout: bool,
 
+    /// Log level. Possible values: trace, debug, info, warn, error, off. If not set, will fall back to ROCUST_LOG.
+    #[arg(long, default_value = None)]
+    log_level: Option<String>,
+
     /// Path to the file where the current results should be written to. If not set, the results will not be written to a file.
     #[arg(long, default_value = None)]
     current_results_file: Option<String>,
@@ -179,6 +206,9 @@ struct ExternalTestConfig {
 pub enum FromExternalTestConfigError {
     #[error("Error while parsing server address: {0}")]
     ServerAddressParseError(#[from] AddrParseError),
+
+    #[error("Error while parsing log level: {0}")]
+    LogLevelError(#[from] LogLevelError),
 }
 
 #[derive(Debug, ThisError)]
@@ -233,6 +263,12 @@ pub enum FromTomlFileError {
     ReadError(#[from] ReadError),
     #[error("Error while creating reader: {0}")]
     CreateError(#[from] CreateError),
+}
+
+#[derive(Debug, ThisError)]
+pub enum LogLevelError {
+    #[error("Invalid log level: {0}")]
+    InvalidLogLevel(String),
 }
 
 impl std::fmt::Display for TestConfig {
