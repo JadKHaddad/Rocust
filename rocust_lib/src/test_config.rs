@@ -177,7 +177,7 @@ struct ExternalTestConfig {
 
 #[derive(Debug, ThisError)]
 pub enum FromExternalTestConfigError {
-    #[error("failed to parse server address: {0}")]
+    #[error("Error while parsing server address: {0}")]
     ServerAddressParseError(#[from] AddrParseError),
 }
 
@@ -185,7 +185,7 @@ pub enum FromExternalTestConfigError {
 pub enum FromJsonError {
     #[error("Error while parsing json: {0}")]
     SerdeJsonError(#[from] SerdeJsonError),
-    #[error("Error converting to TestConfig: {0}")]
+    #[error("Error while converting to TestConfig: {0}")]
     ConversionError(#[from] FromExternalTestConfigError),
 }
 
@@ -195,7 +195,7 @@ pub enum FromJsonFileError {
     FromJson(#[from] FromJsonError),
     #[error("Error while reading json file: {0}")]
     ReadError(#[from] ReadError),
-    #[error("Error creating reader: {0}")]
+    #[error("Error while creating reader: {0}")]
     CreateError(#[from] CreateError),
 }
 
@@ -203,7 +203,7 @@ pub enum FromJsonFileError {
 pub enum FromYamlError {
     #[error("Error while parsing yaml: {0}")]
     SerdeYamlError(#[from] SerdeYamlError),
-    #[error("Error converting to TestConfig: {0}")]
+    #[error("Error while converting to TestConfig: {0}")]
     ConversionError(#[from] FromExternalTestConfigError),
 }
 
@@ -213,7 +213,7 @@ pub enum FromYamlFileError {
     FromYaml(#[from] FromYamlError),
     #[error("Error while reading yaml file: {0}")]
     ReadError(#[from] ReadError),
-    #[error("Error creating reader: {0}")]
+    #[error("Error while creating reader: {0}")]
     CreateError(#[from] CreateError),
 }
 
@@ -221,7 +221,7 @@ pub enum FromYamlFileError {
 pub enum FromTomlError {
     #[error("Error while parsing toml: {0}")]
     SerdeTomlError(#[from] TomlDeError),
-    #[error("Error converting to TestConfig: {0}")]
+    #[error("Error while converting to TestConfig: {0}")]
     ConversionError(#[from] FromExternalTestConfigError),
 }
 
@@ -231,7 +231,7 @@ pub enum FromTomlFileError {
     FromToml(#[from] FromTomlError),
     #[error("Error while reading toml file: {0}")]
     ReadError(#[from] ReadError),
-    #[error("Error creating reader: {0}")]
+    #[error("Error while creating reader: {0}")]
     CreateError(#[from] CreateError),
 }
 
