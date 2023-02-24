@@ -19,7 +19,10 @@ use tokio::{
     time::Instant,
 };
 use tokio_util::sync::CancellationToken;
-use tracing_subscriber::{filter::EnvFilter, FmtSubscriber};
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::{
+    filter::EnvFilter, fmt, prelude::__tracing_subscriber_SubscriberExt, Layer,
+};
 
 #[derive(Clone)]
 pub struct TestController {
@@ -132,29 +135,48 @@ impl Test {
     }
 
     // TODO: this is a bit of a mess, clean it up
-    pub fn setup_logging(&self) {
+    // TODO: check geven logfile
+    // TODO: check if print to stdout
+    pub fn setup_logging(&self) -> WorkerGuard {
+        let file_appender = tracing_appender::rolling::never("results", "prefix.log");
+        let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
         match self.test_config.log_level {
             Some(log_level) => {
-                let subscriber = FmtSubscriber::builder()
-                    .with_max_level(log_level)
-                    .compact()
-                    .finish();
+                let subscriber = tracing_subscriber::registry()
+                    .with(
+                        fmt::layer()
+                            .with_writer(std::io::stdout)
+                            .with_filter(log_level),
+                    )
+                    .with(
+                        fmt::layer()
+                            .with_writer(non_blocking)
+                            .with_filter(log_level),
+                    );
 
                 if let Err(_) = tracing::subscriber::set_global_default(subscriber) {
                     tracing::warn!("Failed to set global default subscriber");
                 }
             }
             None => {
-                let subscriber = FmtSubscriber::builder()
-                    .with_env_filter(EnvFilter::from_env("ROCUST_LOG"))
-                    .compact()
-                    .finish();
+                let subscriber = tracing_subscriber::registry()
+                    .with(
+                        fmt::layer()
+                            .with_writer(std::io::stdout)
+                            .with_filter(EnvFilter::from_env("ROCUST_LOG")),
+                    )
+                    .with(
+                        fmt::layer()
+                            .with_writer(non_blocking)
+                            .with_filter(EnvFilter::from_env("ROCUST_LOG")),
+                    );
 
                 if let Err(_) = tracing::subscriber::set_global_default(subscriber) {
                     tracing::warn!("Failed to set global default subscriber");
                 }
             }
         }
+        guard
     }
 
     pub fn spawn_users<T, S>(
@@ -536,7 +558,7 @@ impl Test {
                                 }
                                 if e.is_panic() {
                                     tracing::error!(
-                                        "User [{}][{}] panicked",
+                                        "User [{}][{}] panic!(ed)",
                                         user_panic_info.name,
                                         user_panic_info.id
                                     )

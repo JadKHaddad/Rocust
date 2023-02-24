@@ -154,7 +154,7 @@ async fn main() {
     // export RUSTFLAGS="--cfg tokio_unstable"
     // export ROCUST_LOG="debug"
     // $Env:RUSTFLAGS="--cfg tokio_unstable"
-    // $Env:ROCUST_LOG="info"
+    // $Env:ROCUST_LOG="debug"
     // console_subscriber::init();
 
     let test_config = TestConfig::new(

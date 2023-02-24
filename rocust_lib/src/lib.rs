@@ -16,8 +16,8 @@ pub(crate) mod writer;
 macro_rules! run {
     ($test:ident, $user_type:ty $(,$user_types:ty)*) => {
         async {
-            // set up the logger
-            $test.setup_logging();
+            // set up the logger, if guard is dropped, the logger will stop
+            let guard = $test.setup_logging();
 
             let (results_tx, results_rx) = $test.before_spawn_users().await;
 
