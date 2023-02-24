@@ -131,6 +131,24 @@ impl User for MyUser {
     }
 }
 
+struct MyUser2 {}
+
+#[has_task(between = "(3, 5)", weight = 2)]
+impl MyUser2 {
+    #[task(priority = 10)]
+    async fn suicide(&mut self, data: &Data) {
+        data.get_user_controller().stop();
+    }
+}
+
+#[async_trait]
+impl User for MyUser2 {
+    type Shared = ();
+    async fn new(_test_config: &TestConfig, _data: &Data, _shared: Self::Shared) -> Self {
+        MyUser2 {}
+    }
+}
+
 #[tokio::main]
 async fn main() {
     // export RUSTFLAGS="--cfg tokio_unstable"
@@ -177,7 +195,7 @@ async fn main() {
         test_controller.stop();
     });
 
-    run!(test, MyUser).await;
+    run!(test, MyUser, MyUser2).await;
 
     //tokio::time::sleep(std::time::Duration::from_secs(60)).await;
 }

@@ -37,6 +37,9 @@ macro_rules! run {
             let full_weight = weights.iter().map(|(_, weight)| weight).sum::<u64>();
             let counts = weights.iter().map(|(name, weight)| (name, $test.get_config().user_count * weight/full_weight)).collect::<std::collections::HashMap<_,_>>();
 
+            // depending on the weights, some users may not be spawned
+            let total_spawnable_user_count = counts.iter().map(|(_, count)| count).sum::<u64>();
+
             let mut spawn_users_handles_vec = Vec::new();
 
             // how much to spawn and index interval as parameters
@@ -59,7 +62,7 @@ macro_rules! run {
 
             // drop the events_handler to drop the sender
             drop(results_tx);
-            $test.after_spawn_users(results_rx, spawn_users_handles_vec).await;
+            $test.after_spawn_users(results_rx, spawn_users_handles_vec, total_spawnable_user_count).await;
         }
     };
 }

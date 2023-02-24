@@ -156,7 +156,7 @@ impl Test {
     {
         let tasks = Arc::new(T::get_async_tasks());
         if tasks.is_empty() {
-            tracing::warn!("User [{}] has no tasks", T::get_name());
+            tracing::warn!("User [{}] has no tasks. Will not be spawned", T::get_name());
             return tokio::spawn(async move { vec![] }); // just to avoid an infinite loop
         }
         let between = T::get_between();
@@ -303,7 +303,7 @@ impl Test {
         }
     }
 
-    fn start_background_tasks(&self) -> JoinHandle<()> {
+    fn start_background_tasks(&self, total_spawnable_user_count: u64) -> JoinHandle<()> {
         // note: not updating stats for every user, only for the whole test. user stats are only updated once when summery is created
         let token = self.token.clone();
         let total_users_spawned_arc_rwlock = self.total_users_spawned_arc_rwlock.clone();
@@ -313,6 +313,7 @@ impl Test {
         let current_results_writer = self.current_results_writer.clone();
         let results_history_writer = self.results_history_writer.clone();
         tokio::spawn(async move {
+            let mut print_total_spawned_users = true;
             loop {
                 tokio::select! {
                     _ = token.cancelled() => {
@@ -320,8 +321,14 @@ impl Test {
                     }
                     _ = tokio::time::sleep(std::time::Duration::from_secs(test_config.update_interval_in_secs)) => {
 
-                        let total_users_spawned_gaurd = total_users_spawned_arc_rwlock.read().await;
-                        tracing::info!("Total users spawned: [{}]", *total_users_spawned_gaurd);
+                        if print_total_spawned_users {
+                            let total_users_spawned_gaurd = total_users_spawned_arc_rwlock.read().await;
+                            tracing::info!("Total users spawned: [{}/{}]", *total_users_spawned_gaurd, total_spawnable_user_count);
+                            if *total_users_spawned_gaurd == total_spawnable_user_count {
+                                tracing::info!("All users spawned [{}]", total_spawnable_user_count);
+                                print_total_spawned_users = false;
+                            }
+                        }
 
                         let mut all_results_gaurd = all_results_arc_rwlock.write().await;
 
@@ -471,6 +478,7 @@ impl Test {
         &self,
         results_rx: mpsc::UnboundedReceiver<MainMessage>,
         spawn_users_handles_vec: Vec<JoinHandle<Vec<(JoinHandle<UserInfo>, UserPanicInfo)>>>,
+        total_spawnable_user_count: u64,
     ) {
         // spin up a server
         let server_handle = self.strat_server();
@@ -479,7 +487,7 @@ impl Test {
         let timer_handle = self.start_timer();
 
         // start the background tasks in another task (calculating stats, printing stats, managing files)
-        let background_tasks_handle = self.start_background_tasks();
+        let background_tasks_handle = self.start_background_tasks(total_spawnable_user_count);
 
         // start the reciever
         self.block_on_reciever(results_rx).await;
