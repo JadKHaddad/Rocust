@@ -6,7 +6,7 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, Error as SerdeJsonError};
 use serde_yaml::{self, Error as SerdeYamlError};
-use std::net::SocketAddr;
+use std::net::{AddrParseError, SocketAddr};
 use thiserror::Error as ThisError;
 use toml::de::Error as TomlDeError;
 
@@ -52,14 +52,14 @@ impl TestConfig {
         }
     }
 
-    pub fn from_cli_args() -> Self {
+    pub fn from_cli_args() -> Result<Self, FromExternalTestConfigError> {
         let external_test_config = ExternalTestConfig::parse();
-        TestConfig::from(external_test_config)
+        Ok(TestConfig::try_from(external_test_config)?)
     }
 
     pub fn from_json_string(json_string: &str) -> Result<Self, FromJsonError> {
         let external_test_config = serde_json::from_str::<ExternalTestConfig>(json_string)?;
-        Ok(TestConfig::from(external_test_config))
+        Ok(TestConfig::try_from(external_test_config)?)
     }
 
     pub async fn from_json_file(json_file_path: &str) -> Result<Self, FromJsonFileError> {
@@ -70,7 +70,7 @@ impl TestConfig {
 
     pub fn from_yaml_string(yaml_string: &str) -> Result<Self, FromYamlError> {
         let external_test_config = serde_yaml::from_str::<ExternalTestConfig>(yaml_string)?;
-        Ok(TestConfig::from(external_test_config))
+        Ok(TestConfig::try_from(external_test_config)?)
     }
 
     pub async fn from_yaml_file(yaml_file_path: &str) -> Result<Self, FromYamlFileError> {
@@ -81,7 +81,7 @@ impl TestConfig {
 
     pub fn from_toml_string(toml_string: &str) -> Result<Self, FromTomlError> {
         let external_test_config = toml::from_str::<ExternalTestConfig>(toml_string)?;
-        Ok(TestConfig::from(external_test_config))
+        Ok(TestConfig::try_from(external_test_config)?)
     }
 
     pub async fn from_toml_file(toml_file_path: &str) -> Result<Self, FromTomlFileError> {
@@ -105,12 +105,17 @@ impl TestConfig {
     }
 }
 
-impl From<ExternalTestConfig> for TestConfig {
-    //TODO: parse server_address
-    //TODO: parse stop_condition
-    //TODO: parse additional_args
-    fn from(external_test_config: ExternalTestConfig) -> Self {
-        Self {
+impl TryFrom<ExternalTestConfig> for TestConfig {
+    type Error = FromExternalTestConfigError;
+
+    fn try_from(external_test_config: ExternalTestConfig) -> Result<Self, Self::Error> {
+        let server_address: Option<SocketAddr> =
+            if let Some(server_address) = external_test_config.server_address {
+                Some(server_address.parse()?)
+            } else {
+                None
+            };
+        Ok(Self {
             user_count: external_test_config.user_count,
             users_per_sec: external_test_config.users_per_sec,
             runtime: external_test_config.runtime,
@@ -118,10 +123,10 @@ impl From<ExternalTestConfig> for TestConfig {
             print_to_stdout: !external_test_config.no_print_to_stdout,
             current_results_file: external_test_config.current_results_file,
             results_history_file: external_test_config.results_history_file,
-            server_address: None,
-            additional_args: vec![],
+            server_address,
+            additional_args: external_test_config.additional_arg,
             stop_condition: None,
-        }
+        })
     }
 }
 
@@ -142,7 +147,7 @@ struct ExternalTestConfig {
     runtime: Option<u64>,
 
     /// Update interval in seconds. How often should the program update it's internal state.
-    #[arg(long, default_value_t = 1)]
+    #[arg(long, default_value_t = 2)]
     update_interval_in_secs: u64,
 
     /// Do not print results to stdout.
@@ -162,18 +167,26 @@ struct ExternalTestConfig {
     server_address: Option<String>,
 
     /// Additional args, will be passed to the users.
-    #[arg(long)]
-    additional_args: Vec<String>,
+    #[arg(long, action = clap::ArgAction::Append)]
+    additional_arg: Vec<String>,
 
-    /// Stop the test when the stop condition is met. The stop condition will be checked at the end of each update phase (every {update_interval} seconds).
+    /// [Not supported yet] Stop the test when the stop condition is met. The stop condition will be checked at the end of each update phase (every {update_interval} seconds).
     #[arg(long)]
     stop_condition: Option<String>,
+}
+
+#[derive(Debug, ThisError)]
+pub enum FromExternalTestConfigError {
+    #[error("failed to parse server address: {0}")]
+    ServerAddressParseError(#[from] AddrParseError),
 }
 
 #[derive(Debug, ThisError)]
 pub enum FromJsonError {
     #[error("Error while parsing json: {0}")]
     SerdeJsonError(#[from] SerdeJsonError),
+    #[error("Error converting to TestConfig: {0}")]
+    ConversionError(#[from] FromExternalTestConfigError),
 }
 
 #[derive(Debug, ThisError)]
@@ -190,6 +203,8 @@ pub enum FromJsonFileError {
 pub enum FromYamlError {
     #[error("Error while parsing yaml: {0}")]
     SerdeYamlError(#[from] SerdeYamlError),
+    #[error("Error converting to TestConfig: {0}")]
+    ConversionError(#[from] FromExternalTestConfigError),
 }
 
 #[derive(Debug, ThisError)]
@@ -206,6 +221,8 @@ pub enum FromYamlFileError {
 pub enum FromTomlError {
     #[error("Error while parsing toml: {0}")]
     SerdeTomlError(#[from] TomlDeError),
+    #[error("Error converting to TestConfig: {0}")]
+    ConversionError(#[from] FromExternalTestConfigError),
 }
 
 #[derive(Debug, ThisError)]
@@ -216,4 +233,14 @@ pub enum FromTomlFileError {
     ReadError(#[from] ReadError),
     #[error("Error creating reader: {0}")]
     CreateError(#[from] CreateError),
+}
+
+impl std::fmt::Display for TestConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "user_count: {}, users_per_sec: {}, runtime: {:?}, update_interval_in_secs: {}, print_to_stdout: {}, current_results_file: {:?}, results_history_file: {:?}, server_address: {:?}, additional_args: {:?}",
+            self.user_count, self.users_per_sec, self.runtime, self.update_interval_in_secs, self.print_to_stdout, self.current_results_file, self.results_history_file, self.server_address, self.additional_args
+        )
+    }
 }
