@@ -73,44 +73,44 @@ impl Results {
         self.calculate_failed_requests_per_second(elapsed);
     }
 
-    pub fn get_total_requests(&self) -> &u32 {
-        &self.total_requests
+    pub fn get_total_requests(&self) -> u32 {
+        self.total_requests
     }
 
-    pub fn get_total_failed_requests(&self) -> &u32 {
-        &self.total_failed_requests
+    pub fn get_total_failed_requests(&self) -> u32 {
+        self.total_failed_requests
     }
 
-    pub fn get_total_errors(&self) -> &u32 {
-        &self.total_errors
+    pub fn get_total_errors(&self) -> u32 {
+        self.total_errors
     }
 
-    pub fn get_total_response_time(&self) -> &f64 {
-        &self.total_response_time
+    pub fn get_total_response_time(&self) -> f64 {
+        self.total_response_time
     }
 
-    pub fn get_average_response_time(&self) -> &f64 {
-        &self.average_response_time
+    pub fn get_average_response_time(&self) -> f64 {
+        self.average_response_time
     }
 
-    pub fn get_min_response_time(&self) -> &f64 {
-        &self.min_response_time
+    pub fn get_min_response_time(&self) -> f64 {
+        self.min_response_time
     }
 
-    pub fn get_median_response_time(&self) -> &f64 {
-        &self.median_response_time
+    pub fn get_median_response_time(&self) -> f64 {
+        self.median_response_time
     }
 
-    pub fn get_max_response_time(&self) -> &f64 {
-        &self.max_response_time
+    pub fn get_max_response_time(&self) -> f64 {
+        self.max_response_time
     }
 
-    pub fn get_requests_per_second(&self) -> &f64 {
-        &self.requests_per_second
+    pub fn get_requests_per_second(&self) -> f64 {
+        self.requests_per_second
     }
 
-    pub fn get_failed_requests_per_second(&self) -> &f64 {
-        &self.failed_requests_per_second
+    pub fn get_failed_requests_per_second(&self) -> f64 {
+        self.failed_requests_per_second
     }
 }
 

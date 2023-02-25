@@ -171,14 +171,14 @@ async fn main() {
         Some(SocketAddr::from(([127, 0, 0, 1], 3000))),
         // additional args, will be provided via CLI
         vec![],
-        // stop condition: stop the test when total failures >= 30
+        // stop condition: stop the test when total failures >= 200
         // stop condition will be checked at the end of each update phase (every {update_interval} seconds})
         Some(|stop_condition_data| {
             if stop_condition_data
                 .get_all_results()
                 .get_aggrigated_results()
                 .get_total_failed_requests()
-                >= &200
+                >= 200
             {
                 return true;
             }
@@ -186,8 +186,8 @@ async fn main() {
         }),
     );
 
-    // or get test config from CLI. server_address, stop_condition and additional_args will be ignored for now (will be implemented later)
-    // cargo run -p dev -- --user-count 20 --users-per-sec 4 --runtime 60 --update-interval-in-secs 3 --log-level "debug" --current-results-file "results/current_results.csv" --results-history-file "results/results_history.csv" --server-address "127.0.0.1:8080" --additional-arg "arg1" --additional-arg "arg2"
+    // or get test config from CLI. stop_condition will be ignored for now (will be implemented later)
+    // cargo run -p dev -- --user-count 20 --users-per-sec 4 --runtime 60 --update-interval-in-secs 3 --log-level "debug" --log-file "results/log.log" --current-results-file "results/current_results.csv" --results-history-file "results/results_history.csv" --server-address "127.0.0.1:8080" --additional-arg "arg1" --additional-arg "arg2"
     //let test_config = TestConfig::from_cli_args().expect("Failed to get test config from CLI args");
 
     let test = Test::new(test_config).await;
