@@ -24,6 +24,11 @@ fn parse_log_level(log_level: &str) -> Result<LevelFilter, LogLevelError> {
     }
 }
 
+pub fn log_level_from_env() -> LevelFilter {
+    let log_level = std::env::var("ROCUST_LOG").unwrap_or_else(|_| "off".to_string());
+    parse_log_level(&log_level).unwrap_or(LevelFilter::OFF)
+}
+
 #[derive(Clone)]
 pub struct TestConfig {
     pub user_count: u64,
@@ -31,7 +36,9 @@ pub struct TestConfig {
     pub runtime: Option<u64>,
     pub update_interval_in_secs: u64,
     pub print_to_stdout: bool,
+    pub log_to_stdout: bool,
     pub log_level: Option<LevelFilter>,
+    pub log_file: Option<String>,
     pub current_results_file: Option<String>,
     pub results_history_file: Option<String>,
     pub server_address: Option<SocketAddr>,
@@ -47,7 +54,9 @@ impl TestConfig {
         runtime: Option<u64>,
         update_interval_in_secs: u64,
         print_to_stdout: bool,
+        log_to_stdout: bool,
         log_level: Option<LevelFilter>,
+        log_file: Option<String>,
         current_results_file: Option<String>,
         results_history_file: Option<String>,
         server_address: Option<SocketAddr>,
@@ -60,7 +69,9 @@ impl TestConfig {
             runtime,
             update_interval_in_secs,
             print_to_stdout,
+            log_to_stdout,
             log_level,
+            log_file,
             current_results_file,
             results_history_file,
             server_address,
@@ -143,7 +154,9 @@ impl TryFrom<ExternalTestConfig> for TestConfig {
             runtime: external_test_config.runtime,
             update_interval_in_secs: external_test_config.update_interval_in_secs,
             print_to_stdout: !external_test_config.no_print_to_stdout,
+            log_to_stdout: !external_test_config.no_log_to_stdout,
             log_level,
+            log_file: external_test_config.log_file,
             current_results_file: external_test_config.current_results_file,
             results_history_file: external_test_config.results_history_file,
             server_address,
@@ -177,9 +190,17 @@ struct ExternalTestConfig {
     #[arg(long)]
     no_print_to_stdout: bool,
 
+    /// Do not log to stdout.
+    #[arg(long)]
+    no_log_to_stdout: bool,
+
     /// Log level. Possible values: trace, debug, info, warn, error, off. If not set, will fall back to ROCUST_LOG.
     #[arg(long, default_value = None)]
     log_level: Option<String>,
+
+    /// Path to the file where the log should be written to. If not set, the log will not be written to a file.
+    #[arg(long, default_value = None)]
+    log_file: Option<String>,
 
     /// Path to the file where the current results should be written to. If not set, the results will not be written to a file.
     #[arg(long, default_value = None)]

@@ -154,7 +154,7 @@ async fn main() {
     // export RUSTFLAGS="--cfg tokio_unstable"
     // export ROCUST_LOG="debug"
     // $Env:RUSTFLAGS="--cfg tokio_unstable"
-    // $Env:ROCUST_LOG="debug"
+    // $Env:ROCUST_LOG="info"
     // console_subscriber::init();
 
     let test_config = TestConfig::new(
@@ -163,7 +163,9 @@ async fn main() {
         Some(10),
         2,
         true,
+        true,
         Some(tracing::level_filters::LevelFilter::INFO),
+        Some(String::from("results/log.log")),
         Some(String::from("results/current_results.csv")),
         Some(String::from("results/results_history.csv")),
         Some(SocketAddr::from(([127, 0, 0, 1], 3000))),

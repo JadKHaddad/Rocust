@@ -4,7 +4,7 @@ use crate::{
     messages::{MainMessage, ResultMessage},
     results::AllResults,
     server::Server,
-    test_config::TestConfig,
+    test_config::{log_level_from_env, TestConfig},
     traits::{HasTask, PrioritisedRandom, Shared, User},
     user::{UserController, UserInfo, UserPanicInfo},
     utils::get_timestamp_as_millis_as_string,
@@ -20,9 +20,7 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::{
-    filter::EnvFilter, fmt, prelude::__tracing_subscriber_SubscriberExt, Layer,
-};
+use tracing_subscriber::{fmt, prelude::__tracing_subscriber_SubscriberExt, Layer};
 
 #[derive(Clone)]
 pub struct TestController {
@@ -135,46 +133,30 @@ impl Test {
     }
 
     // TODO: this is a bit of a mess, clean it up. A perfect example of "make it work for now and forget to clean it up later"
-    // TODO: check given logfile
-    // TODO: check if print to stdout
+    // TODO: check if log to stdout and if logfile is set
     pub fn setup_logging(&self) -> WorkerGuard {
+        let log_level = if let Some(log_level) = self.test_config.log_level {
+            log_level
+        } else {
+            log_level_from_env()
+        };
+
         let file_appender = tracing_appender::rolling::never("results", "prefix.log");
         let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
-        match self.test_config.log_level {
-            Some(log_level) => {
-                let subscriber = tracing_subscriber::registry()
-                    .with(
-                        fmt::layer()
-                            .with_writer(std::io::stdout)
-                            .with_filter(log_level),
-                    )
-                    .with(
-                        fmt::layer()
-                            .with_writer(non_blocking)
-                            .with_filter(log_level),
-                    );
+        let subscriber = tracing_subscriber::registry()
+            .with(
+                fmt::layer()
+                    .with_writer(std::io::stdout)
+                    .with_filter(log_level),
+            )
+            .with(
+                fmt::layer()
+                    .with_writer(non_blocking)
+                    .with_filter(log_level),
+            );
 
-                if let Err(_) = tracing::subscriber::set_global_default(subscriber) {
-                    tracing::warn!("Failed to set global default subscriber");
-                }
-            }
-            None => {
-                let subscriber = tracing_subscriber::registry()
-                    .with(
-                        fmt::layer()
-                            .with_writer(std::io::stdout)
-                            .with_filter(EnvFilter::from_env("ROCUST_LOG")),
-                    )
-                    .with(
-                        fmt::layer()
-                            .with_writer(non_blocking)
-                            .with_filter(EnvFilter::from_env("ROCUST_LOG")),
-                    );
-
-                if let Err(_) = tracing::subscriber::set_global_default(subscriber) {
-                    tracing::warn!("Failed to set global default subscriber");
-                }
-            }
+        if let Err(_) = tracing::subscriber::set_global_default(subscriber) {
+            tracing::warn!("Failed to set global default subscriber");
         }
         guard
     }
