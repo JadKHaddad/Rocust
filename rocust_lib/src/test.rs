@@ -1,10 +1,11 @@
 use crate::{
     data::{Data, StopConditionData},
     events::EventsHandler,
+    logging::setup_logging,
     messages::{MainMessage, ResultMessage},
     results::AllResults,
     server::Server,
-    test_config::{log_level_from_env, TestConfig},
+    test_config::TestConfig,
     traits::{HasTask, PrioritisedRandom, Shared, User},
     user::{UserController, UserInfo, UserPanicInfo},
     utils::get_timestamp_as_millis_as_string,
@@ -19,8 +20,6 @@ use tokio::{
     time::Instant,
 };
 use tokio_util::sync::CancellationToken;
-use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::{fmt, prelude::__tracing_subscriber_SubscriberExt, Layer};
 
 #[derive(Clone)]
 pub struct TestController {
@@ -132,79 +131,12 @@ impl Test {
         tokio::time::sleep(Duration::from_secs(between)).await;
     }
 
-    // TODO: this is a bit of a mess
-    pub fn setup_logging(&self) -> Option<WorkerGuard> {
-        let log_level = if let Some(log_level) = self.test_config.log_level {
-            log_level
-        } else {
-            log_level_from_env()
-        };
-
-        let log_file = self.test_config.log_file.clone();
-        let log_to_stdout = self.test_config.log_to_stdout;
-
-        if let Some(log_file) = log_file {
-            // get parent directory
-            let parent_dir = match std::path::Path::new(&log_file).parent() {
-                Some(parent_dir) => parent_dir,
-                None => {
-                    tracing::error!("Failed to get parent directory of log file");
-                    return None;
-                }
-            };
-
-            // get file name
-            let file_name = match std::path::Path::new(&log_file).file_name() {
-                Some(file_name) => file_name,
-                None => {
-                    tracing::error!("Failed to get file name of log file");
-                    return None;
-                }
-            };
-
-            let file_appender = tracing_appender::rolling::never(parent_dir, file_name);
-            let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
-            if log_to_stdout {
-                let subscriber = tracing_subscriber::registry()
-                    .with(
-                        fmt::layer()
-                            .with_writer(std::io::stdout)
-                            .with_filter(log_level),
-                    )
-                    .with(
-                        fmt::layer()
-                            .with_writer(non_blocking)
-                            .with_ansi(false)
-                            .with_filter(log_level),
-                    );
-                if let Err(_) = tracing::subscriber::set_global_default(subscriber) {
-                    tracing::warn!("Failed to set global default subscriber");
-                }
-            } else {
-                let subscriber = tracing_subscriber::registry().with(
-                    fmt::layer()
-                        .with_writer(non_blocking)
-                        .with_ansi(false)
-                        .with_filter(log_level),
-                );
-
-                if let Err(_) = tracing::subscriber::set_global_default(subscriber) {
-                    tracing::warn!("Failed to set global default subscriber");
-                }
-            }
-            return Some(guard);
-        } else if log_to_stdout {
-            let subscriber = tracing_subscriber::registry().with(
-                fmt::layer()
-                    .with_writer(std::io::stdout)
-                    .with_filter(log_level),
-            );
-            if let Err(_) = tracing::subscriber::set_global_default(subscriber) {
-                tracing::warn!("Failed to set global default subscriber");
-            }
-            return None;
-        }
-        None
+    pub fn setup_logging(&self) {
+        setup_logging(
+            self.test_config.log_level,
+            self.test_config.log_to_stdout,
+            self.test_config.log_file.clone(),
+        );
     }
 
     pub fn spawn_users<T, S>(

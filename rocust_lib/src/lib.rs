@@ -1,5 +1,6 @@
 pub mod data;
 pub mod events;
+pub(crate) mod logging;
 pub(crate) mod messages;
 pub(crate) mod reader;
 pub mod results;

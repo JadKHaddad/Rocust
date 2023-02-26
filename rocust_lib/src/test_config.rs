@@ -1,5 +1,6 @@
 use crate::{
     data::StopConditionData,
+    logging::{parse_log_level, LogLevelError},
     reader::{CreateError, ReadError, Reader},
 };
 use clap::Parser;
@@ -10,24 +11,6 @@ use std::net::{AddrParseError, SocketAddr};
 use thiserror::Error as ThisError;
 use toml::de::Error as TomlDeError;
 use tracing::level_filters::LevelFilter;
-
-fn parse_log_level(log_level: &str) -> Result<LevelFilter, LogLevelError> {
-    let log_level = log_level.to_lowercase();
-    match log_level.as_str() {
-        "trace" => Ok(LevelFilter::TRACE),
-        "debug" => Ok(LevelFilter::DEBUG),
-        "info" => Ok(LevelFilter::INFO),
-        "warn" => Ok(LevelFilter::WARN),
-        "error" => Ok(LevelFilter::ERROR),
-        "off" => Ok(LevelFilter::OFF),
-        _ => Err(LogLevelError::InvalidLogLevel(log_level.to_string())),
-    }
-}
-
-pub fn log_level_from_env() -> LevelFilter {
-    let log_level = std::env::var("ROCUST_LOG").unwrap_or_else(|_| "off".to_string());
-    parse_log_level(&log_level).unwrap_or(LevelFilter::OFF)
-}
 
 #[derive(Clone)]
 pub struct TestConfig {
@@ -284,12 +267,6 @@ pub enum FromTomlFileError {
     ReadError(#[from] ReadError),
     #[error("Error while creating reader: {0}")]
     CreateError(#[from] CreateError),
-}
-
-#[derive(Debug, ThisError)]
-pub enum LogLevelError {
-    #[error("Invalid log level: {0}")]
-    InvalidLogLevel(String),
 }
 
 impl std::fmt::Display for TestConfig {
