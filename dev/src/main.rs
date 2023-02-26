@@ -33,9 +33,9 @@ struct MyUser {
     client: Client,
 }
 
-#[has_task(between = "(3, 5)", weight = 1)]
+#[has_task(min_sleep = 1, max_sleep = 2, weight = 6)]
 impl MyUser {
-    #[task(priority = 20)]
+    #[task(priority = 2)]
     pub async fn index(&mut self, data: &Data) {
         let start = std::time::Instant::now();
         let res = self.client.get("https://google.com").send().await;
@@ -133,7 +133,7 @@ impl User for MyUser {
 
 struct MyUser2 {}
 
-#[has_task(between = "(3, 5)", weight = 2)]
+#[has_task(min_sleep = 1, max_sleep = 1, weight = 1)]
 impl MyUser2 {
     #[task(priority = 10)]
     async fn suicide(&mut self, data: &Data) {

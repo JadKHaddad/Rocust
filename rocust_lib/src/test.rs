@@ -127,8 +127,13 @@ impl Test {
     }
 
     async fn sleep_between(between: (u64, u64)) {
-        let between = rand::thread_rng().gen_range(between.0..between.1);
-        tokio::time::sleep(Duration::from_secs(between)).await;
+        // make sure we don't panic on an empty range
+        if between.0 >= between.1 {
+            tokio::time::sleep(Duration::from_secs(between.0)).await;
+            return;
+        }
+        let sleep_time = rand::thread_rng().gen_range(between.0..between.1);
+        tokio::time::sleep(Duration::from_secs(sleep_time)).await;
     }
 
     pub fn setup_logging(&self) {

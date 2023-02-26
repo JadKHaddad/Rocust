@@ -7,55 +7,62 @@ use syn::{parse_macro_input, AttributeArgs};
 pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
     let attrs = parse_macro_input!(attrs as AttributeArgs);
     let mut impl_block = syn::parse_macro_input!(item as syn::ItemImpl);
-    // check if between is set
-    let mut min = 0;
-    let mut max = 0;
+
+    let mut min_sleep = 0;
+    let mut max_sleep = 0;
     let mut weight = 1;
 
     for attr in attrs {
         if let syn::NestedMeta::Meta(syn::Meta::NameValue(name_value)) = attr {
-            if name_value.path.get_ident().unwrap().to_string() == "between" {
-                if let syn::Lit::Str(lit_str) = name_value.lit {
-                    let between_str = lit_str.value();
-                    let between_str = between_str.split_whitespace().collect::<String>();
-                    if between_str.starts_with('(') && between_str.ends_with(')') {
-                        let between_str = &between_str[1..between_str.len() - 1];
-                        let between_str = between_str.trim();
-                        let between_str = between_str.split(',');
-                        let between_str = between_str.collect::<Vec<&str>>();
-                        if between_str.len() != 2 {
-                            panic!("between has to have 2 values");
-                        }
-                        min = between_str[0].parse::<u64>().unwrap();
-                        max = between_str[1].parse::<u64>().unwrap();
-                    } else {
-                        panic!("between has to be in the format (min, max)");
-                    }
+            if name_value.path.get_ident().unwrap().to_string() == "min_sleep" {
+                if let syn::Lit::Int(lit_str) = name_value.lit {
+                    min_sleep = match lit_str.base10_digits().parse::<u64>() {
+                        Ok(val) => val,
+                        Err(_) => panic!("min_sleep has to be u64"),
+                    };
                 } else {
-                    panic!("between has to be a string");
+                    panic!("min_sleep has to be an integer");
+                }
+            } else if name_value.path.get_ident().unwrap().to_string() == "max_sleep" {
+                if let syn::Lit::Int(lit_str) = name_value.lit {
+                    max_sleep = match lit_str.base10_digits().parse::<u64>() {
+                        Ok(val) => val,
+                        Err(_) => panic!("max_sleep has to be u64"),
+                    };
+                } else {
+                    panic!("max_sleep has to be an integer");
                 }
             } else if name_value.path.get_ident().unwrap().to_string() == "weight" {
                 if let syn::Lit::Int(lit_str) = name_value.lit {
-                    weight = lit_str.base10_digits().parse::<u64>().unwrap();
+                    weight = match lit_str.base10_digits().parse::<u64>() {
+                        Ok(val) => val,
+                        Err(_) => panic!("weight has to be u64"),
+                    };
                 } else {
-                    panic!("weight has to be a number");
+                    panic!("weight has to be an integer");
                 }
             } else {
-                panic!("Only between and weight are supported");
+                panic!("Only min_sleep, max_sleep and weight are supported");
             }
         } else {
             panic!("Only Meta is supported");
         }
     }
-    let min = syn::LitInt::new(&min.to_string(), proc_macro2::Span::call_site());
-    let max = syn::LitInt::new(&max.to_string(), proc_macro2::Span::call_site());
+
+    if max_sleep < min_sleep {
+        panic!("max_sleep cannot be smaller than min_sleep");
+    }
+
+    let min_sleep = syn::LitInt::new(&min_sleep.to_string(), proc_macro2::Span::call_site());
+    let max_sleep = syn::LitInt::new(&max_sleep.to_string(), proc_macro2::Span::call_site());
     let weight = syn::LitInt::new(&weight.to_string(), proc_macro2::Span::call_site());
 
     let struct_name = if let syn::Type::Path(type_path) = &impl_block.self_ty.as_ref() {
         if let Some(ident) = type_path.path.get_ident() {
-            ident
+            ident.clone()
         } else {
-            panic!("Could not get ident from type path");
+            // here we have some generics and lifetimes, let's just deny them for now
+            panic!("Generics and lifetimes are not supported");
         }
     } else {
         panic!("Could not get type path from self type");
@@ -74,11 +81,11 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
 
             for attr in task_attrs {
                 let mut token_stream = attr.tokens.clone().into_iter();
-                if let TokenTree::Group(group) = token_stream.next().unwrap() {
+                if let TokenTree::Group(group) = token_stream.next().expect("No group found") {
                     let tokens = group.stream();
                     let mut iter = tokens.into_iter();
 
-                    if let TokenTree::Ident(ident) = iter.next().unwrap() {
+                    if let TokenTree::Ident(ident) = iter.next().expect("No ident found") {
                         if ident.to_string() != "priority" {
                             panic!("Only priority is supported");
                         }
@@ -86,7 +93,7 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
                         panic!("Only Ident is supported");
                     };
 
-                    if let TokenTree::Punct(punct) = iter.next().unwrap() {
+                    if let TokenTree::Punct(punct) = iter.next().expect("No punct found") {
                         if punct.as_char() != '=' {
                             panic!("Only '=' is supported");
                         }
@@ -94,7 +101,7 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
                         panic!("Only Punct is supported");
                     };
 
-                    if let TokenTree::Literal(lit) = iter.next().unwrap() {
+                    if let TokenTree::Literal(lit) = iter.next().expect("No literal found") {
                         if let Ok(priority) = lit.to_string().parse::<u64>() {
                             if method.sig.asyncness.is_none() {
                                 panic!("Only async methods are supported");
@@ -105,7 +112,8 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
                             panic!("Only u64 is supported");
                         }
                     } else {
-                        panic!("Only Literal is supported");
+                        //panic!("Only Literal is supported");
+                        panic!("Only u64 is supported");
                     };
                 }
             }
@@ -142,7 +150,7 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
             }
 
             fn get_between() -> (u64, u64) {
-                (#min, #max)
+                (#min_sleep, #max_sleep)
             }
 
             fn get_weight() -> u64 {
