@@ -7,7 +7,7 @@ use crate::{
     server::Server,
     test_config::TestConfig,
     traits::{HasTask, PrioritisedRandom, Shared, User},
-    user::{SpawnedUserInfo, SpawnedUserPanicInfo, UserController, UserInfo},
+    user::{UserController, UserInfo, UserPanicInfo},
     utils::get_timestamp_as_millis_as_string,
     writer::Writer,
 };
@@ -48,7 +48,7 @@ pub struct Test {
     results_history_writer: Option<Writer>,
     total_users_spawned_arc_rwlock: Arc<RwLock<u64>>,
     all_results_arc_rwlock: Arc<RwLock<AllResults>>,
-    users_results_arc_rwlock: Arc<RwLock<HashMap<String, HashMap<u64, AllResults>>>>,
+    users_results_arc_rwlock: Arc<RwLock<HashMap<u64, AllResults>>>,
     start_timestamp_arc_rwlock: Arc<RwLock<Instant>>,
 }
 
@@ -151,7 +151,7 @@ impl Test {
         results_tx: mpsc::UnboundedSender<MainMessage>,
         test_controller: Arc<TestController>,
         shared: S,
-    ) -> JoinHandle<Vec<(JoinHandle<SpawnedUserInfo>, SpawnedUserPanicInfo)>>
+    ) -> JoinHandle<Vec<(JoinHandle<UserInfo>, UserPanicInfo)>>
     where
         T: HasTask + User + User<Shared = S> + 'static,
         S: Shared + 'static,
@@ -182,10 +182,7 @@ impl Test {
                 let user_token = Arc::new(CancellationToken::new());
                 let user_spawn_token = user_token.clone();
                 let user_controller = UserController::new(id.clone(), user_token.clone());
-                let events_handler = EventsHandler::new(
-                    UserInfo::new(id.clone(), T::get_name()),
-                    results_tx.clone(),
-                );
+                let events_handler = EventsHandler::new(id.clone(), results_tx.clone());
 
                 // create the data for the user
                 let user_data = Data::new(
@@ -231,10 +228,10 @@ impl Test {
                     }
 
                     user.on_stop(&user_data).await;
-                    SpawnedUserInfo::new(id, T::get_name(), total_tasks)
+                    UserInfo::new(id, T::get_name(), total_tasks)
                 });
-                handles.push((handle, SpawnedUserPanicInfo::new(id, T::get_name())));
-                events_handler.add_user_spawned();
+                handles.push((handle, UserPanicInfo::new(id, T::get_name())));
+                events_handler.add_user_spawned(id, T::get_name());
                 users_spawned += 1;
                 if users_spawned % users_per_sec == 0 {
                     tokio::select! {
@@ -418,32 +415,24 @@ impl Test {
                                 sucess_result_msg.response_time,
                             );
                             // updating user results
-                            if let Some(user_by_name_all_results) =
-                                users_results_gaurd.get_mut(&sucess_result_msg.user_info.name)
+                            if let Some(user_all_results) =
+                                users_results_gaurd.get_mut(&sucess_result_msg.user_id)
                             {
-                                if let Some(user_by_id_all_results) = user_by_name_all_results
-                                    .get_mut(&sucess_result_msg.user_info.id)
-                                {
-                                    user_by_id_all_results.add_success(
-                                        &sucess_result_msg.endpoint_type_name,
-                                        sucess_result_msg.response_time,
-                                    );
-                                }
+                                user_all_results.add_success(
+                                    &sucess_result_msg.endpoint_type_name,
+                                    sucess_result_msg.response_time,
+                                );
                             }
                         }
                         ResultMessage::Failure(failure_result_msg) => {
                             all_results_gaurd.add_failure(&failure_result_msg.endpoint_type_name);
 
                             // updating user results
-                            if let Some(user_by_name_all_results) =
-                                users_results_gaurd.get_mut(&failure_result_msg.user_info.name)
+                            if let Some(user_all_results) =
+                                users_results_gaurd.get_mut(&failure_result_msg.user_id)
                             {
-                                if let Some(user_by_id_all_results) = user_by_name_all_results
-                                    .get_mut(&failure_result_msg.user_info.id)
-                                {
-                                    user_by_id_all_results
-                                        .add_failure(&failure_result_msg.endpoint_type_name);
-                                }
+                                user_all_results
+                                    .add_failure(&failure_result_msg.endpoint_type_name);
                             }
                         }
                         ResultMessage::Error(error_result_msg) => {
@@ -453,17 +442,13 @@ impl Test {
                             );
 
                             // updating user results
-                            if let Some(user_by_name_all_results) =
-                                users_results_gaurd.get_mut(&error_result_msg.user_info.name)
+                            if let Some(user_all_results) =
+                                users_results_gaurd.get_mut(&error_result_msg.user_id)
                             {
-                                if let Some(user_by_id_all_results) =
-                                    user_by_name_all_results.get_mut(&error_result_msg.user_info.id)
-                                {
-                                    user_by_id_all_results.add_error(
-                                        &error_result_msg.endpoint_type_name,
-                                        &error_result_msg.error,
-                                    );
-                                }
+                                user_all_results.add_error(
+                                    &error_result_msg.endpoint_type_name,
+                                    &error_result_msg.error,
+                                );
                             }
                         }
                     }
@@ -474,20 +459,7 @@ impl Test {
                     *total_users_spawned_gaurd += 1;
 
                     let mut users_results_gaurd = self.users_results_arc_rwlock.write().await;
-
-                    // check if user's name exists in map and add AllResults::default() to the map based on id
-                    if let Some(user_by_name_all_results) =
-                        users_results_gaurd.get_mut(&user_spawned_msg.user_info.name)
-                    {
-                        user_by_name_all_results
-                            .insert(user_spawned_msg.user_info.id, AllResults::default());
-                    } else {
-                        // add user name to map and add AllResults::default() to the map based on id
-                        let mut map = HashMap::new();
-                        map.insert(user_spawned_msg.user_info.id, AllResults::default());
-
-                        users_results_gaurd.insert(user_spawned_msg.user_info.name.clone(), map);
-                    }
+                    users_results_gaurd.insert(user_spawned_msg.id, AllResults::default());
                 }
             }
         }
@@ -507,9 +479,7 @@ impl Test {
     pub async fn after_spawn_users(
         &self,
         results_rx: mpsc::UnboundedReceiver<MainMessage>,
-        spawn_users_handles_vec: Vec<
-            JoinHandle<Vec<(JoinHandle<SpawnedUserInfo>, SpawnedUserPanicInfo)>>,
-        >,
+        spawn_users_handles_vec: Vec<JoinHandle<Vec<(JoinHandle<UserInfo>, UserPanicInfo)>>>,
         total_spawnable_user_count: u64,
     ) {
         // spin up a server
@@ -588,15 +558,11 @@ impl Test {
         // Dev: print all results of all users. but lets do a quick update of the results
         let elapsed_time =
             Test::calculate_elapsed_time(&*self.start_timestamp_arc_rwlock.read().await);
-        for (user_name, user_by_name_results) in
-            self.users_results_arc_rwlock.write().await.iter_mut()
-        {
-            for (user_id, user_results) in user_by_name_results.iter_mut() {
-                user_results.calculate_per_second(&elapsed_time);
-                println!("User [{}][{}]", user_name, user_id);
-                println!("{:#?}", user_results);
-                println!("--------------------------------");
-            }
+        for (user_id, user_results) in self.users_results_arc_rwlock.write().await.iter_mut() {
+            user_results.calculate_per_second(&elapsed_time);
+            println!("User [{}]", user_id);
+            println!("{:#?}", user_results);
+            println!("--------------------------------");
         }
     }
 }

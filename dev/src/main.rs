@@ -28,14 +28,14 @@ impl Shared for MyShared {
     }
 }
 
-struct GoogleTester {
+struct MyUser {
     id: u64,
     client: Client,
 }
 
 #[has_task(max_sleep = 2, weight = 6)]
-impl GoogleTester {
-    #[task(priority = 20)]
+impl MyUser {
+    #[task(priority = 2)]
     pub async fn index(&mut self, data: &Data) {
         let start = std::time::Instant::now();
         let res = self.client.get("https://google.com").send().await;
@@ -111,13 +111,13 @@ impl GoogleTester {
 }
 
 #[async_trait]
-impl User for GoogleTester {
+impl User for MyUser {
     type Shared = ();
 
     async fn new(_test_config: &TestConfig, data: &Data, _shared: Self::Shared) -> Self {
         let client = Client::new();
-        GoogleTester {
-            id: data.get_events_handler().get_user_id(),
+        MyUser {
+            id: data.get_events_handler().get_id(),
             client,
         }
     }
@@ -131,10 +131,10 @@ impl User for GoogleTester {
     }
 }
 
-struct Suicider {}
+struct MyUser2 {}
 
 #[has_task(min_sleep = 1, max_sleep = 1, weight = 1)]
-impl Suicider {
+impl MyUser2 {
     #[task(priority = 10)]
     async fn suicide(&mut self, data: &Data) {
         data.get_user_controller().stop();
@@ -142,10 +142,10 @@ impl Suicider {
 }
 
 #[async_trait]
-impl User for Suicider {
+impl User for MyUser2 {
     type Shared = ();
     async fn new(_test_config: &TestConfig, _data: &Data, _shared: Self::Shared) -> Self {
-        Suicider {}
+        MyUser2 {}
     }
 }
 
@@ -198,7 +198,7 @@ async fn main() {
         test_controller.stop();
     });
 
-    run!(test, GoogleTester, Suicider).await;
+    run!(test, MyUser, MyUser2).await;
 
     //tokio::time::sleep(std::time::Duration::from_secs(60)).await;
 }
