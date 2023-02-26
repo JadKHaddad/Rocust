@@ -33,7 +33,7 @@ struct MyUser {
     client: Client,
 }
 
-#[has_task(max_sleep = 2, weight = 6)]
+#[has_task(min_sleep = 1, max_sleep = 2, weight = 6)]
 impl MyUser {
     #[task(priority = 2)]
     pub async fn index(&mut self, data: &Data) {

@@ -3,15 +3,10 @@ use proc_macro2::TokenTree;
 use quote::quote;
 use syn::{parse_macro_input, AttributeArgs};
 
-#[proc_macro_error::proc_macro_error]
 #[proc_macro_attribute]
 pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
     let attrs = parse_macro_input!(attrs as AttributeArgs);
     let mut impl_block = syn::parse_macro_input!(item as syn::ItemImpl);
-
-    let mut min_sleep_is_set = false;
-    let mut max_sleep_is_set = false;
-    let mut weight_is_set = false;
 
     let mut min_sleep = 0;
     let mut max_sleep = 0;
@@ -28,7 +23,6 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
                 } else {
                     panic!("min_sleep has to be an integer");
                 }
-                min_sleep_is_set = true;
             } else if name_value.path.get_ident().unwrap().to_string() == "max_sleep" {
                 if let syn::Lit::Int(lit_str) = name_value.lit {
                     max_sleep = match lit_str.base10_digits().parse::<u64>() {
@@ -38,7 +32,6 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
                 } else {
                     panic!("max_sleep has to be an integer");
                 }
-                max_sleep_is_set = true;
             } else if name_value.path.get_ident().unwrap().to_string() == "weight" {
                 if let syn::Lit::Int(lit_str) = name_value.lit {
                     weight = match lit_str.base10_digits().parse::<u64>() {
@@ -48,7 +41,6 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
                 } else {
                     panic!("weight has to be an integer");
                 }
-                weight_is_set = true;
             } else {
                 panic!("Only min_sleep, max_sleep and weight are supported");
             }
@@ -59,18 +51,6 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
 
     if max_sleep < min_sleep {
         panic!("max_sleep cannot be smaller than min_sleep");
-    }
-
-    if !min_sleep_is_set {
-        proc_macro_error::emit_call_site_warning!("min_sleep is not set, defaulting to 0");
-    }
-
-    if !max_sleep_is_set {
-        proc_macro_error::emit_call_site_warning!("max_sleep is not set, defaulting to 0");
-    }
-
-    if !weight_is_set {
-        proc_macro_error::emit_call_site_warning!("weight is not set, defaulting to 1");
     }
 
     let min_sleep = syn::LitInt::new(&min_sleep.to_string(), proc_macro2::Span::call_site());
