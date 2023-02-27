@@ -71,7 +71,7 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
     let name = syn::LitStr::new(&struct_name.to_string(), proc_macro2::Span::call_site());
     let mut methods = Vec::new();
 
-    // collect all the methods names if they have a "proiority" attribute and the value is a number (i32) and delete the attribute
+    // collect all the methods names if they have a "proiority" attribute and the value is a number (u64) and delete the attribute
     for item in impl_block.items.iter_mut() {
         if let syn::ImplItem::Method(method) = item {
             let task_attrs = method
