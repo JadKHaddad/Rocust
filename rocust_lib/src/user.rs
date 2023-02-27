@@ -19,10 +19,11 @@ impl UserSummary {
 
 #[derive(Debug, Clone)]
 pub enum UserSummaryStatus {
-    Joined,
+    Finished,
     Spawned,
     Panicked,
-    Cancelled,
+    Cancelled, // cancelled by himself
+    Unknown,
 }
 
 #[derive(Debug, Clone)]

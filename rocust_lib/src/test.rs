@@ -227,6 +227,7 @@ impl Test {
                             tokio::select! {
                                 _ = user_token.cancelled() => {
                                     tracing::info!("User [{}][{}] attempted suicide", T::get_name(), id);
+                                    // TODO: status of user will be cancelled
                                     break;
                                 }
                                 _ = test_token_for_user.cancelled() => {
@@ -539,7 +540,7 @@ impl Test {
                         let mut total_tasks = None;
                         match handle.await {
                             Ok(user_info) => {
-                                status = UserSummaryStatus::Joined;
+                                status = UserSummaryStatus::Finished;
                                 total_tasks = Some(user_info.total_tasks);
                                 // tracing::info!(
                                 //     "User [{}][{}] finished with [{}] tasks",
@@ -550,7 +551,7 @@ impl Test {
                             }
                             Err(e) => {
                                 if e.is_cancelled() {
-                                    status = UserSummaryStatus::Cancelled;
+                                    status = UserSummaryStatus::Unknown;
                                     // tracing::warn!(
                                     //     "User [{}][{}] was cancelled",
                                     //     user_panic_info.name,
