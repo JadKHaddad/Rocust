@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-pub trait HasTask {
+pub trait HasTask: 'static {
     fn get_async_tasks() -> Vec<crate::tasks::AsyncTask<Self>>
     where
         Self: Sized,
@@ -20,8 +20,9 @@ pub trait HasTask {
         1
     }
 }
+
 #[async_trait]
-pub trait User: Send + Sized {
+pub trait User: Send + Sized + 'static {
     type Shared: Shared;
 
     async fn new(_test_config: &TestConfig, _data: &Data, _shared: Self::Shared) -> Self;
@@ -30,7 +31,7 @@ pub trait User: Send + Sized {
 }
 
 #[async_trait]
-pub trait Shared: Clone + Send {
+pub trait Shared: Clone + Send + 'static {
     async fn new() -> Self;
 }
 
@@ -42,7 +43,7 @@ pub trait PrioritisedRandom<T>
 where
     T: Prioritised,
 {
-    fn get_proioritised_random(&self) -> Option<&T>;
+    fn get_prioritised_random(&self) -> Option<&T>;
 }
 
 use rand::{distributions::WeightedIndex, prelude::Distribution};
@@ -53,7 +54,7 @@ impl<T> PrioritisedRandom<T> for Vec<T>
 where
     T: Prioritised,
 {
-    fn get_proioritised_random(&self) -> Option<&T> {
+    fn get_prioritised_random(&self) -> Option<&T> {
         let weights: Vec<u64> = self.iter().map(|o| o.get_priority()).collect();
         if let Ok(distrib) = WeightedIndex::new(weights) {
             let mut rng = rand::thread_rng();

@@ -7,7 +7,10 @@ use crate::{
     server::Server,
     test_config::TestConfig,
     traits::{HasTask, PrioritisedRandom, Shared, User},
-    user::{UserController, UserInfo, UserPanicInfo},
+    user::{
+        JoinHandleSpawnedUserInfo, JoinHandleSpawnedUserPanicInfo, UserAllResults, UserController,
+        UserInfo,
+    },
     utils::get_timestamp_as_millis_as_string,
     writer::Writer,
 };
@@ -48,7 +51,7 @@ pub struct Test {
     results_history_writer: Option<Writer>,
     total_users_spawned_arc_rwlock: Arc<RwLock<u64>>,
     all_results_arc_rwlock: Arc<RwLock<AllResults>>,
-    users_results_arc_rwlock: Arc<RwLock<HashMap<u64, AllResults>>>,
+    users_results_arc_rwlock: Arc<RwLock<HashMap<u64, UserAllResults>>>,
     start_timestamp_arc_rwlock: Arc<RwLock<Instant>>,
 }
 
@@ -151,10 +154,15 @@ impl Test {
         results_tx: mpsc::UnboundedSender<MainMessage>,
         test_controller: Arc<TestController>,
         shared: S,
-    ) -> JoinHandle<Vec<(JoinHandle<UserInfo>, UserPanicInfo)>>
+    ) -> JoinHandle<
+        Vec<(
+            JoinHandle<JoinHandleSpawnedUserInfo>,
+            JoinHandleSpawnedUserPanicInfo,
+        )>,
+    >
     where
-        T: HasTask + User + User<Shared = S> + 'static,
-        S: Shared + 'static,
+        T: HasTask + User + User<Shared = S>,
+        S: Shared,
     {
         let tasks = Arc::new(T::get_async_tasks());
         if tasks.is_empty() {
@@ -182,7 +190,8 @@ impl Test {
                 let user_token = Arc::new(CancellationToken::new());
                 let user_spawn_token = user_token.clone();
                 let user_controller = UserController::new(id.clone(), user_token.clone());
-                let events_handler = EventsHandler::new(id.clone(), results_tx.clone());
+                let user_info = UserInfo::new(id.clone(), T::get_name());
+                let events_handler = EventsHandler::new(user_info, results_tx.clone());
 
                 // create the data for the user
                 let user_data = Data::new(
@@ -201,7 +210,7 @@ impl Test {
 
                     loop {
                         // get a random task
-                        if let Some(task) = tasks.get_proioritised_random() {
+                        if let Some(task) = tasks.get_prioritised_random() {
                             // call it, do some sleep
                             let task_call_and_sleep = async {
                                 // this is the sleep time of a user
@@ -228,10 +237,13 @@ impl Test {
                     }
 
                     user.on_stop(&user_data).await;
-                    UserInfo::new(id, T::get_name(), total_tasks)
+                    JoinHandleSpawnedUserInfo::new(id, T::get_name(), total_tasks)
                 });
-                handles.push((handle, UserPanicInfo::new(id, T::get_name())));
-                events_handler.add_user_spawned(id, T::get_name());
+                handles.push((
+                    handle,
+                    JoinHandleSpawnedUserPanicInfo::new(id, T::get_name()),
+                ));
+                events_handler.add_user_spawned();
                 users_spawned += 1;
                 if users_spawned % users_per_sec == 0 {
                     tokio::select! {
@@ -418,7 +430,7 @@ impl Test {
                             if let Some(user_all_results) =
                                 users_results_gaurd.get_mut(&sucess_result_msg.user_id)
                             {
-                                user_all_results.add_success(
+                                user_all_results.all_results.add_success(
                                     &sucess_result_msg.endpoint_type_name,
                                     sucess_result_msg.response_time,
                                 );
@@ -432,6 +444,7 @@ impl Test {
                                 users_results_gaurd.get_mut(&failure_result_msg.user_id)
                             {
                                 user_all_results
+                                    .all_results
                                     .add_failure(&failure_result_msg.endpoint_type_name);
                             }
                         }
@@ -445,7 +458,7 @@ impl Test {
                             if let Some(user_all_results) =
                                 users_results_gaurd.get_mut(&error_result_msg.user_id)
                             {
-                                user_all_results.add_error(
+                                user_all_results.all_results.add_error(
                                     &error_result_msg.endpoint_type_name,
                                     &error_result_msg.error,
                                 );
@@ -459,7 +472,13 @@ impl Test {
                     *total_users_spawned_gaurd += 1;
 
                     let mut users_results_gaurd = self.users_results_arc_rwlock.write().await;
-                    users_results_gaurd.insert(user_spawned_msg.id, AllResults::default());
+                    users_results_gaurd.insert(
+                        user_spawned_msg.user_info.id,
+                        UserAllResults::new(
+                            user_spawned_msg.user_info.name.clone(),
+                            AllResults::default(),
+                        ),
+                    );
                 }
             }
         }
@@ -479,7 +498,14 @@ impl Test {
     pub async fn after_spawn_users(
         &self,
         results_rx: mpsc::UnboundedReceiver<MainMessage>,
-        spawn_users_handles_vec: Vec<JoinHandle<Vec<(JoinHandle<UserInfo>, UserPanicInfo)>>>,
+        spawn_users_handles_vec: Vec<
+            JoinHandle<
+                Vec<(
+                    JoinHandle<JoinHandleSpawnedUserInfo>,
+                    JoinHandleSpawnedUserPanicInfo,
+                )>,
+            >,
+        >,
         total_spawnable_user_count: u64,
     ) {
         // spin up a server
@@ -558,10 +584,12 @@ impl Test {
         // Dev: print all results of all users. but lets do a quick update of the results
         let elapsed_time =
             Test::calculate_elapsed_time(&*self.start_timestamp_arc_rwlock.read().await);
-        for (user_id, user_results) in self.users_results_arc_rwlock.write().await.iter_mut() {
-            user_results.calculate_per_second(&elapsed_time);
-            println!("User [{}]", user_id);
-            println!("{:#?}", user_results);
+        for (user_id, user_all_results) in self.users_results_arc_rwlock.write().await.iter_mut() {
+            user_all_results
+                .all_results
+                .calculate_per_second(&elapsed_time);
+            println!("User [{}][{}]", user_all_results.name, user_id);
+            println!("{:#?}", user_all_results.all_results);
             println!("--------------------------------");
         }
     }

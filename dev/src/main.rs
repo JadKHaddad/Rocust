@@ -117,7 +117,7 @@ impl User for MyUser {
     async fn new(_test_config: &TestConfig, data: &Data, _shared: Self::Shared) -> Self {
         let client = Client::new();
         MyUser {
-            id: data.get_events_handler().get_id(),
+            id: data.get_events_handler().get_user_id(),
             client,
         }
     }
