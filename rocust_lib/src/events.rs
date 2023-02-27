@@ -4,18 +4,18 @@ use crate::{
         UserSpawnedMessage,
     },
     results::EndpointTypeName,
-    user::UserInfo,
+    user::EventsUserInfo,
 };
 use tokio::sync::mpsc::UnboundedSender;
 
 #[derive(Debug, Clone)]
 pub struct EventsHandler {
-    user_info: UserInfo,
+    user_info: EventsUserInfo,
     sender: UnboundedSender<MainMessage>,
 }
 
 impl EventsHandler {
-    pub fn new(user_info: UserInfo, sender: UnboundedSender<MainMessage>) -> Self {
+    pub fn new(user_info: EventsUserInfo, sender: UnboundedSender<MainMessage>) -> Self {
         Self { user_info, sender }
     }
 

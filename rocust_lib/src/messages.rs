@@ -1,4 +1,4 @@
-use crate::{results::EndpointTypeName, user::UserInfo};
+use crate::{results::EndpointTypeName, user::EventsUserInfo};
 
 pub enum MainMessage {
     ResultMessage(ResultMessage),
@@ -6,7 +6,7 @@ pub enum MainMessage {
 }
 
 pub struct UserSpawnedMessage {
-    pub(crate) user_info: UserInfo,
+    pub(crate) user_info: EventsUserInfo,
 }
 
 pub enum ResultMessage {

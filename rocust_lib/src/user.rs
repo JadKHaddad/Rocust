@@ -3,24 +3,54 @@ use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Clone)]
-pub struct UserAllResults {
-    pub name: String,
+pub struct UserSummary {
+    pub user_info: UserSummaryInfo,
     pub all_results: AllResults,
 }
 
-impl UserAllResults {
-    pub fn new(name: String, all_results: AllResults) -> Self {
-        Self { name, all_results }
+impl UserSummary {
+    pub fn new(user_info: UserSummaryInfo, all_results: AllResults) -> Self {
+        Self {
+            user_info,
+            all_results,
+        }
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct UserInfo {
+pub enum UserSummaryStatus {
+    Joined,
+    Spawned,
+    Panicked,
+    Cancelled,
+}
+
+#[derive(Debug, Clone)]
+pub struct UserSummaryInfo {
+    pub id: u64,
+    pub name: String,
+    pub status: UserSummaryStatus,
+    pub total_tasks: Option<u64>, // None if panicked
+}
+
+impl UserSummaryInfo {
+    pub fn new(id: u64, name: String) -> Self {
+        Self {
+            id,
+            name,
+            status: UserSummaryStatus::Spawned,
+            total_tasks: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EventsUserInfo {
     pub id: u64,
     pub name: String,
 }
 
-impl UserInfo {
+impl EventsUserInfo {
     pub fn new(id: u64, name: String) -> Self {
         Self { id, name }
     }

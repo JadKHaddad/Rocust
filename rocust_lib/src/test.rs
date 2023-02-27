@@ -8,8 +8,8 @@ use crate::{
     test_config::TestConfig,
     traits::{HasTask, PrioritisedRandom, Shared, User},
     user::{
-        JoinHandleSpawnedUserInfo, JoinHandleSpawnedUserPanicInfo, UserAllResults, UserController,
-        UserInfo,
+        EventsUserInfo, JoinHandleSpawnedUserInfo, JoinHandleSpawnedUserPanicInfo, UserController,
+        UserSummary, UserSummaryInfo, UserSummaryStatus,
     },
     utils::get_timestamp_as_millis_as_string,
     writer::Writer,
@@ -51,7 +51,7 @@ pub struct Test {
     results_history_writer: Option<Writer>,
     total_users_spawned_arc_rwlock: Arc<RwLock<u64>>,
     all_results_arc_rwlock: Arc<RwLock<AllResults>>,
-    users_results_arc_rwlock: Arc<RwLock<HashMap<u64, UserAllResults>>>,
+    users_results_arc_rwlock: Arc<RwLock<HashMap<u64, UserSummary>>>,
     start_timestamp_arc_rwlock: Arc<RwLock<Instant>>,
 }
 
@@ -190,7 +190,7 @@ impl Test {
                 let user_token = Arc::new(CancellationToken::new());
                 let user_spawn_token = user_token.clone();
                 let user_controller = UserController::new(id.clone(), user_token.clone());
-                let user_info = UserInfo::new(id.clone(), T::get_name());
+                let user_info = EventsUserInfo::new(id.clone(), T::get_name());
                 let events_handler = EventsHandler::new(user_info, results_tx.clone());
 
                 // create the data for the user
@@ -220,6 +220,8 @@ impl Test {
                                 task.call(&mut user, &user_data).await;
 
                                 total_tasks += 1;
+                                // TODO: How about sending a message to the main thread to update the total tasks? in this case
+                                // we would know how many tasks were executed by user even if the user panicked
                             };
 
                             tokio::select! {
@@ -427,10 +429,10 @@ impl Test {
                                 sucess_result_msg.response_time,
                             );
                             // updating user results
-                            if let Some(user_all_results) =
+                            if let Some(user_summary) =
                                 users_results_gaurd.get_mut(&sucess_result_msg.user_id)
                             {
-                                user_all_results.all_results.add_success(
+                                user_summary.all_results.add_success(
                                     &sucess_result_msg.endpoint_type_name,
                                     sucess_result_msg.response_time,
                                 );
@@ -440,10 +442,10 @@ impl Test {
                             all_results_gaurd.add_failure(&failure_result_msg.endpoint_type_name);
 
                             // updating user results
-                            if let Some(user_all_results) =
+                            if let Some(user_summary) =
                                 users_results_gaurd.get_mut(&failure_result_msg.user_id)
                             {
-                                user_all_results
+                                user_summary
                                     .all_results
                                     .add_failure(&failure_result_msg.endpoint_type_name);
                             }
@@ -455,10 +457,10 @@ impl Test {
                             );
 
                             // updating user results
-                            if let Some(user_all_results) =
+                            if let Some(user_summary) =
                                 users_results_gaurd.get_mut(&error_result_msg.user_id)
                             {
-                                user_all_results.all_results.add_error(
+                                user_summary.all_results.add_error(
                                     &error_result_msg.endpoint_type_name,
                                     &error_result_msg.error,
                                 );
@@ -474,8 +476,11 @@ impl Test {
                     let mut users_results_gaurd = self.users_results_arc_rwlock.write().await;
                     users_results_gaurd.insert(
                         user_spawned_msg.user_info.id,
-                        UserAllResults::new(
-                            user_spawned_msg.user_info.name.clone(),
+                        UserSummary::new(
+                            UserSummaryInfo::new(
+                                user_spawned_msg.user_info.id,
+                                user_spawned_msg.user_info.name.clone(),
+                            ),
                             AllResults::default(),
                         ),
                     );
@@ -529,32 +534,44 @@ impl Test {
             match spawn_users_handles.await {
                 Ok(handles) => {
                     for (handle, user_panic_info) in handles {
-                        // TODO: create summary of all users and save it to a file
+                        // TODO: update the user summary
+                        let mut status = UserSummaryStatus::Spawned;
+                        let mut total_tasks = None;
                         match handle.await {
                             Ok(user_info) => {
-                                tracing::info!(
-                                    "User [{}][{}] finished with [{}] tasks",
-                                    user_info.name,
-                                    user_info.id,
-                                    user_info.total_tasks
-                                )
+                                status = UserSummaryStatus::Joined;
+                                total_tasks = Some(user_info.total_tasks);
+                                // tracing::info!(
+                                //     "User [{}][{}] finished with [{}] tasks",
+                                //     user_info.name,
+                                //     user_info.id,
+                                //     user_info.total_tasks
+                                // )
                             }
                             Err(e) => {
                                 if e.is_cancelled() {
-                                    tracing::warn!(
-                                        "User [{}][{}] was cancelled",
-                                        user_panic_info.name,
-                                        user_panic_info.id
-                                    )
+                                    status = UserSummaryStatus::Cancelled;
+                                    // tracing::warn!(
+                                    //     "User [{}][{}] was cancelled",
+                                    //     user_panic_info.name,
+                                    //     user_panic_info.id
+                                    // )
                                 }
                                 if e.is_panic() {
-                                    tracing::error!(
-                                        "User [{}][{}] panic!(ed)",
-                                        user_panic_info.name,
-                                        user_panic_info.id
-                                    )
+                                    status = UserSummaryStatus::Panicked;
+                                    // tracing::error!(
+                                    //     "User [{}][{}] panic!(ed)",
+                                    //     user_panic_info.name,
+                                    //     user_panic_info.id
+                                    // )
                                 }
                             }
+                        }
+                        let mut users_results_gaurd = self.users_results_arc_rwlock.write().await;
+                        if let Some(user_summary) = users_results_gaurd.get_mut(&user_panic_info.id)
+                        {
+                            user_summary.user_info.status = status;
+                            user_summary.user_info.total_tasks = total_tasks;
                         }
                     }
                 }
@@ -580,16 +597,14 @@ impl Test {
 
         tracing::info!("Test finished");
 
-        // TODO: remove dev
+        // TODO: Create a vector of all the UserSummary and serialize it to a file
         // Dev: print all results of all users. but lets do a quick update of the results
         let elapsed_time =
             Test::calculate_elapsed_time(&*self.start_timestamp_arc_rwlock.read().await);
-        for (user_id, user_all_results) in self.users_results_arc_rwlock.write().await.iter_mut() {
-            user_all_results
-                .all_results
-                .calculate_per_second(&elapsed_time);
-            println!("User [{}][{}]", user_all_results.name, user_id);
-            println!("{:#?}", user_all_results.all_results);
+        for (user_id, user_summary) in self.users_results_arc_rwlock.write().await.iter_mut() {
+            user_summary.all_results.calculate_per_second(&elapsed_time);
+            println!("User [{}][{}]", user_summary.user_info.name, user_id);
+            println!("{:#?}", user_summary);
             println!("--------------------------------");
         }
     }
