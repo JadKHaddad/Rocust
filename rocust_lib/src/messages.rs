@@ -3,6 +3,16 @@ use crate::{results::EndpointTypeName, user::EventsUserInfo};
 pub enum MainMessage {
     ResultMessage(ResultMessage),
     UserSpawned(UserSpawnedMessage),
+    UserSelfStopped(UserSelfStoppedMessage),
+    TaskExecuted(TaskExecutedMessage),
+}
+
+pub struct UserSelfStoppedMessage {
+    pub(crate) user_id: u64,
+}
+
+pub struct TaskExecutedMessage {
+    pub(crate) user_id: u64,
 }
 
 pub struct UserSpawnedMessage {

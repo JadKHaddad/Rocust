@@ -44,6 +44,10 @@ impl Data {
     pub fn get_user_controller(&self) -> &UserController {
         &self.user_controller
     }
+
+    pub fn get_user_id(&self) -> u64 {
+        self.events_handler.get_user_id()
+    }
 }
 
 pub struct StopConditionData<'a> {

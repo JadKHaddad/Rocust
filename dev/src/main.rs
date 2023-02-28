@@ -33,9 +33,9 @@ struct MyUser {
     client: Client,
 }
 
-#[has_task(min_sleep = 1, max_sleep = 2, weight = 6)]
+#[has_task(min_sleep = 1, max_sleep = 2, weight = 5)]
 impl MyUser {
-    #[task(priority = 2)]
+    #[task(priority = 40)]
     pub async fn index(&mut self, data: &Data) {
         let start = std::time::Instant::now();
         let res = self.client.get("https://google.com").send().await;
@@ -65,7 +65,7 @@ impl MyUser {
         }
     }
 
-    #[task(priority = 20)]
+    #[task(priority = 40)]
     pub async fn none_existing_path(&mut self, data: &Data) {
         let start = std::time::Instant::now();
         let res = self
@@ -104,7 +104,7 @@ impl MyUser {
         panic!("This task will panic");
     }
 
-    #[task(priority = 10)]
+    #[task(priority = 1)]
     async fn suicide(&mut self, data: &Data) {
         data.get_user_controller().stop();
     }
@@ -123,11 +123,11 @@ impl User for MyUser {
     }
 
     async fn on_start(&mut self, _: &Data) {
-        println!("User {} started", self.id);
+        println!("MyUser {} started", self.id);
     }
 
     async fn on_stop(&mut self, _: &Data) {
-        println!("User {} stopped", self.id);
+        println!("MyUser {} stopped", self.id);
     }
 }
 
@@ -135,7 +135,7 @@ struct MyUser2 {}
 
 #[has_task(min_sleep = 1, max_sleep = 1, weight = 1)]
 impl MyUser2 {
-    #[task(priority = 10)]
+    #[task(priority = 1)]
     async fn suicide(&mut self, data: &Data) {
         data.get_user_controller().stop();
     }
@@ -146,6 +146,14 @@ impl User for MyUser2 {
     type Shared = ();
     async fn new(_test_config: &TestConfig, _data: &Data, _shared: Self::Shared) -> Self {
         MyUser2 {}
+    }
+
+    async fn on_start(&mut self, data: &Data) {
+        println!("MyUser2 {} started", data.get_user_id());
+    }
+
+    async fn on_stop(&mut self, data: &Data) {
+        println!("MyUser2 {} stopped", data.get_user_id());
     }
 }
 
@@ -159,8 +167,8 @@ async fn main() {
 
     let test_config = TestConfig::new(
         20,
-        10,
-        Some(10),
+        1,
+        Some(30),
         2,
         true,
         true,
@@ -190,7 +198,7 @@ async fn main() {
     // cargo run -p dev -- --user-count 20 --users-per-sec 4 --runtime 60 --update-interval-in-secs 3 --log-level "debug" --log-file "results/log.log" --current-results-file "results/current_results.csv" --results-history-file "results/results_history.csv" --server-address "127.0.0.1:8080" --additional-arg "arg1" --additional-arg "arg2"
     //let test_config = TestConfig::from_cli_args().expect("Failed to get test config from CLI args");
 
-    let test = Test::new(test_config).await;
+    let mut test = Test::new(test_config).await;
     let test_controller = test.create_test_controller();
 
     tokio::spawn(async move {
