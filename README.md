@@ -18,6 +18,7 @@ cargo run -p dev
 ## TODO
 - [X] TestConfig from CLI
 - [X] TestConfig from file: TOML, YAML, JSON
+- [ ] User summary
 - [ ] Stop condition parser to create a stop condition from a string
 - [ ] Documentation
 - [ ] Examples
