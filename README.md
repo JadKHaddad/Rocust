@@ -24,7 +24,7 @@ cargo run -p dev
 - [ ] Examples
 - [ ] Tests
 - [ ] Web interface
-- [ ] Master/workers architecture
+- [ ] Master/workers architecture (prio.)
 - [ ] Other Features
 
 ## Rust version 
