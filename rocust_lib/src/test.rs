@@ -148,6 +148,7 @@ impl Test {
         );
     }
 
+    // TODO: this method spawns users with a spawn rate, that depends on the user type and not the global spawn rate for all given users
     pub fn spawn_users<T, S>(
         &self,
         count: u64,
@@ -168,6 +169,7 @@ impl Test {
         );
         let tasks = Arc::new(T::get_async_tasks());
         if tasks.is_empty() {
+            // TODO: total users spawned will always be logged since it will never reach total spawnbale users
             tracing::warn!("User [{}] has no tasks. Will not be spawned", T::get_name());
             return tokio::spawn(async move { vec![] }); // just to avoid an infinite loop
         }

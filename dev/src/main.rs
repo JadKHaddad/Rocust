@@ -129,10 +129,10 @@ struct MyUser2 {}
 
 #[has_task(min_sleep = 1, max_sleep = 1, weight = 1)]
 impl MyUser2 {
-    #[task(priority = 1)]
-    async fn suicide(&mut self, context: &Context) {
-        context.stop();
-    }
+    // #[task(priority = 1)]
+    // async fn suicide(&mut self, context: &Context) {
+    //     context.stop();
+    // }
 }
 
 #[async_trait]
