@@ -159,8 +159,13 @@ impl Test {
     where
         T: HasTask + User + User<Shared = S>,
         S: Shared,
-    {   
-        tracing::info!("Spawning [{}][{}] users, starting at index [{}]", count, T::get_name(), starting_index);
+    {
+        tracing::info!(
+            "Spawning [{}][{}] users, starting at index [{}]",
+            count,
+            T::get_name(),
+            starting_index
+        );
         let tasks = Arc::new(T::get_async_tasks());
         if tasks.is_empty() {
             tracing::warn!("User [{}] has no tasks. Will not be spawned", T::get_name());
@@ -185,13 +190,12 @@ impl Test {
 
                 // create a user token for the UserController
                 let user_token = Arc::new(CancellationToken::new());
-                let user_spawn_token = user_token.clone();
                 let user_controller = UserController::new(user_token.clone());
                 let user_info = EventsUserInfo::new(id.clone(), T::get_name());
                 let events_handler = EventsHandler::new(user_info, results_tx.clone());
 
                 // create the data for the user
-                let user_data = Context::new(
+                let user_context = Context::new(
                     test_controller.clone(),
                     events_handler.clone(),
                     user_controller,
@@ -202,8 +206,8 @@ impl Test {
 
                 let handle = tokio::spawn(async move {
                     events_handler.add_user_spawned();
-                    let mut user = T::new(&test_config, &user_data, shared).await;                    
-                    user.on_start(&user_data).await;
+                    let mut user = T::new(&test_config, &user_context, shared).await;
+                    user.on_start(&user_context).await;
 
                     loop {
                         // get a random task
@@ -214,14 +218,14 @@ impl Test {
                                 Test::sleep_between(between).await;
 
                                 // this is the actual task
-                                task.call(&mut user, &user_data).await;
-                                user_data.get_events_handler().add_task_executed();
+                                task.call(&mut user, &user_context).await;
+                                user_context.get_events_handler().add_task_executed();
                             };
 
                             tokio::select! {
                                 _ = user_token.cancelled() => {
                                     tracing::info!("User [{}][{}] attempted suicide", T::get_name(), id);
-                                    user_data.get_events_handler().add_user_self_stopped();
+                                    user_context.get_events_handler().add_user_self_stopped();
                                     break;
                                 }
                                 _ = test_token_for_user.cancelled() => {
@@ -232,16 +236,12 @@ impl Test {
                             }
                         }
                     }
-                    user.on_stop(&user_data).await;
+                    user.on_stop(&user_context).await;
                 });
                 handles.push((handle, id));
                 users_spawned += 1;
                 if users_spawned % users_per_sec == 0 {
                     tokio::select! {
-                        _ = user_spawn_token.cancelled() => {
-                            tracing::info!("User [{}][{}] attempted suicide", T::get_name(), id);
-                            break;
-                        }
                         _ = test_spawn_token.cancelled() => {
                             break;
                         }
