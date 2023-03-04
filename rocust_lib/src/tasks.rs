@@ -1,4 +1,4 @@
-use crate::{data::Data, traits::Prioritised};
+use crate::{context::Context, traits::Prioritised};
 use std::{future::Future, pin::Pin};
 
 #[derive(Clone)]
@@ -7,13 +7,13 @@ where
     T: 'static,
 {
     priority: u64,
-    func: for<'a> fn(&'a mut T, &'a Data) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>>,
+    func: for<'a> fn(&'a mut T, &'a Context) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>>,
 }
 
 impl<T> AsyncTask<T> {
     pub fn new(
         priority: u64,
-        func: for<'a> fn(&'a mut T, &'a Data) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>>,
+        func: for<'a> fn(&'a mut T, &'a Context) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>>,
     ) -> Self {
         AsyncTask { priority, func }
     }
@@ -22,7 +22,7 @@ impl<T> AsyncTask<T> {
         self.priority
     }
 
-    pub async fn call(&self, user: &mut T, data: &Data) {
+    pub async fn call(&self, user: &mut T, data: &Context) {
         (self.func)(user, data).await;
     }
 }

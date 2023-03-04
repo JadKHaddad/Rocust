@@ -3,7 +3,7 @@ use crate::{
 };
 use std::{sync::Arc, time::Duration};
 
-pub struct Data {
+pub struct Context {
     // each user will recieve a Data obj containing
 
     // arc because it is shared between all users
@@ -20,7 +20,7 @@ pub struct Data {
     // the user could track his own results in his internal state or use the shared object accross all users
 }
 
-impl Data {
+impl Context {
     pub fn new(
         test_controller: Arc<TestController>,
         events_handler: EventsHandler,
@@ -33,19 +33,31 @@ impl Data {
         }
     }
 
-    pub fn get_test_controller(&self) -> &Arc<TestController> {
-        &self.test_controller
+    pub fn stop(&self) {
+        self.user_controller.stop();
     }
 
-    pub fn get_events_handler(&self) -> &EventsHandler {
+    pub fn stop_test(&self) {
+        self.test_controller.stop();
+    }
+
+    pub fn add_success(&self, r#type: String, name: String, response_time: f64) {
+        self.events_handler.add_success(r#type, name, response_time);
+    }
+
+    pub fn add_failure(&self, r#type: String, name: String) {
+        self.events_handler.add_failure(r#type, name);
+    }
+
+    pub fn add_error(&self, r#type: String, name: String, error: String) {
+        self.events_handler.add_error(r#type, name, error);
+    }
+
+    pub(crate) fn get_events_handler(&self) -> &EventsHandler {
         &self.events_handler
     }
 
-    pub fn get_user_controller(&self) -> &UserController {
-        &self.user_controller
-    }
-
-    pub fn get_user_id(&self) -> u64 {
+    pub fn get_id(&self) -> u64 {
         self.events_handler.get_user_id()
     }
 }

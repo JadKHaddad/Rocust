@@ -1,5 +1,5 @@
 use crate::{
-    data::StopConditionData,
+    context::StopConditionData,
     logging::{parse_log_level, LogLevelError},
     reader::{CreateError, ReadError, Reader},
 };

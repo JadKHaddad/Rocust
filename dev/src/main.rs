@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use reqwest::Client;
 use rocust::{
     rocust_lib::{
-        data::Data,
+        context::Context,
         run,
         test::Test,
         test_config::TestConfig,
@@ -36,7 +36,7 @@ struct MyUser {
 #[has_task(min_sleep = 1, max_sleep = 2, weight = 5)]
 impl MyUser {
     #[task(priority = 40)]
-    pub async fn index(&mut self, data: &Data) {
+    pub async fn index(&mut self, context: &Context) {
         let start = std::time::Instant::now();
         let res = self.client.get("https://google.com").send().await;
         let end = std::time::Instant::now();
@@ -45,18 +45,13 @@ impl MyUser {
                 if res.status().is_success() {
                     let duration = end.duration_since(start);
                     let duration = duration.as_secs_f64();
-                    data.get_events_handler().add_success(
-                        String::from("GET"),
-                        String::from("/"),
-                        duration,
-                    );
+                    context.add_success(String::from("GET"), String::from("/"), duration);
                 } else {
-                    data.get_events_handler()
-                        .add_failure(String::from("GET"), String::from("/"));
+                    context.add_failure(String::from("GET"), String::from("/"));
                 }
             }
             Err(_) => {
-                data.get_events_handler().add_error(
+                context.add_error(
                     String::from("GET"),
                     String::from("/"),
                     String::from("error"),
@@ -66,7 +61,7 @@ impl MyUser {
     }
 
     #[task(priority = 40)]
-    pub async fn none_existing_path(&mut self, data: &Data) {
+    pub async fn none_existing_path(&mut self, context: &Context) {
         let start = std::time::Instant::now();
         let res = self
             .client
@@ -79,18 +74,17 @@ impl MyUser {
                 if res.status().is_success() {
                     let duration = end.duration_since(start);
                     let duration = duration.as_secs_f64();
-                    data.get_events_handler().add_success(
+                    context.add_success(
                         String::from("GET"),
                         String::from("/none_existing_path"),
                         duration,
                     );
                 } else {
-                    data.get_events_handler()
-                        .add_failure(String::from("GET"), String::from("/none_existing_path"));
+                    context.add_failure(String::from("GET"), String::from("/none_existing_path"));
                 }
             }
             Err(_) => {
-                data.get_events_handler().add_error(
+                context.add_error(
                     String::from("GET"),
                     String::from("/none_existing_path"),
                     String::from("error"),
@@ -100,13 +94,13 @@ impl MyUser {
     }
 
     #[task(priority = 1)]
-    async fn will_panic(&mut self, _data: &Data) {
+    async fn will_panic(&mut self, _context: &Context) {
         panic!("This task will panic");
     }
 
     #[task(priority = 1)]
-    async fn suicide(&mut self, data: &Data) {
-        data.get_user_controller().stop();
+    async fn suicide(&mut self, context: &Context) {
+        context.stop();
     }
 }
 
@@ -114,19 +108,19 @@ impl MyUser {
 impl User for MyUser {
     type Shared = ();
 
-    async fn new(_test_config: &TestConfig, data: &Data, _shared: Self::Shared) -> Self {
+    async fn new(_test_config: &TestConfig, context: &Context, _shared: Self::Shared) -> Self {
         let client = Client::new();
         MyUser {
-            id: data.get_events_handler().get_user_id(),
+            id: context.get_id(),
             client,
         }
     }
 
-    async fn on_start(&mut self, _: &Data) {
+    async fn on_start(&mut self, _: &Context) {
         println!("MyUser {} started", self.id);
     }
 
-    async fn on_stop(&mut self, _: &Data) {
+    async fn on_stop(&mut self, _: &Context) {
         println!("MyUser {} stopped", self.id);
     }
 }
@@ -136,24 +130,24 @@ struct MyUser2 {}
 #[has_task(min_sleep = 1, max_sleep = 1, weight = 1)]
 impl MyUser2 {
     #[task(priority = 1)]
-    async fn suicide(&mut self, data: &Data) {
-        data.get_user_controller().stop();
+    async fn suicide(&mut self, context: &Context) {
+        context.stop();
     }
 }
 
 #[async_trait]
 impl User for MyUser2 {
     type Shared = ();
-    async fn new(_test_config: &TestConfig, _data: &Data, _shared: Self::Shared) -> Self {
+    async fn new(_test_config: &TestConfig, _context: &Context, _shared: Self::Shared) -> Self {
         MyUser2 {}
     }
 
-    async fn on_start(&mut self, data: &Data) {
-        println!("MyUser2 {} started", data.get_user_id());
+    async fn on_start(&mut self, context: &Context) {
+        println!("MyUser2 {} started", context.get_id());
     }
 
-    async fn on_stop(&mut self, data: &Data) {
-        println!("MyUser2 {} stopped", data.get_user_id());
+    async fn on_stop(&mut self, context: &Context) {
+        println!("MyUser2 {} stopped", context.get_id());
     }
 }
 
@@ -171,7 +165,7 @@ async fn main() {
         Some(30),
         2,
         true,
-        true,
+        false,
         Some(tracing::level_filters::LevelFilter::INFO),
         Some(String::from("results/log.log")),
         Some(String::from("results/current_results.csv")),

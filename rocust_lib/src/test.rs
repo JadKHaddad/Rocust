@@ -1,5 +1,5 @@
 use crate::{
-    data::{Data, StopConditionData},
+    context::{Context, StopConditionData},
     events::EventsHandler,
     logging::setup_logging,
     messages::{MainMessage, ResultMessage},
@@ -20,6 +20,7 @@ use tokio::{
     time::Instant,
 };
 use tokio_util::sync::CancellationToken;
+use tracing_appender::non_blocking::WorkerGuard;
 
 #[derive(Clone)]
 pub struct TestController {
@@ -50,6 +51,8 @@ pub struct Test {
     all_results_arc_rwlock: Arc<RwLock<AllResults>>,
     user_stats_collection: UserStatsCollection,
     start_timestamp_arc_rwlock: Arc<RwLock<Instant>>,
+    // on test drop, the worker guard will be dropped, which will stop the logging thread
+    async_log_writer_worker_guard: Option<WorkerGuard>,
 }
 
 impl Test {
@@ -111,6 +114,7 @@ impl Test {
             all_results_arc_rwlock: Arc::new(RwLock::new(AllResults::default())),
             user_stats_collection: UserStatsCollection::new(),
             start_timestamp_arc_rwlock: Arc::new(RwLock::new(Instant::now())),
+            async_log_writer_worker_guard: None,
         }
     }
 
@@ -136,8 +140,8 @@ impl Test {
         tokio::time::sleep(Duration::from_secs(sleep_time)).await;
     }
 
-    pub fn setup_logging(&self) {
-        setup_logging(
+    pub fn setup_logging(&mut self) {
+        self.async_log_writer_worker_guard = setup_logging(
             self.test_config.log_level,
             self.test_config.log_to_stdout,
             self.test_config.log_file.clone(),
@@ -155,7 +159,8 @@ impl Test {
     where
         T: HasTask + User + User<Shared = S>,
         S: Shared,
-    {
+    {   
+        tracing::info!("Spawning [{}][{}] users, starting at index [{}]", count, T::get_name(), starting_index);
         let tasks = Arc::new(T::get_async_tasks());
         if tasks.is_empty() {
             tracing::warn!("User [{}] has no tasks. Will not be spawned", T::get_name());
@@ -181,12 +186,12 @@ impl Test {
                 // create a user token for the UserController
                 let user_token = Arc::new(CancellationToken::new());
                 let user_spawn_token = user_token.clone();
-                let user_controller = UserController::new(id.clone(), user_token.clone());
+                let user_controller = UserController::new(user_token.clone());
                 let user_info = EventsUserInfo::new(id.clone(), T::get_name());
                 let events_handler = EventsHandler::new(user_info, results_tx.clone());
 
                 // create the data for the user
-                let user_data = Data::new(
+                let user_data = Context::new(
                     test_controller.clone(),
                     events_handler.clone(),
                     user_controller,
@@ -196,7 +201,8 @@ impl Test {
                 let shared = shared.clone();
 
                 let handle = tokio::spawn(async move {
-                    let mut user = T::new(&test_config, &user_data, shared).await;
+                    events_handler.add_user_spawned();
+                    let mut user = T::new(&test_config, &user_data, shared).await;                    
                     user.on_start(&user_data).await;
 
                     loop {
@@ -226,11 +232,9 @@ impl Test {
                             }
                         }
                     }
-
                     user.on_stop(&user_data).await;
                 });
                 handles.push((handle, id));
-                events_handler.add_user_spawned();
                 users_spawned += 1;
                 if users_spawned % users_per_sec == 0 {
                     tokio::select! {

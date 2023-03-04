@@ -133,17 +133,12 @@ impl EventsUserInfo {
 }
 
 pub struct UserController {
-    id: u64,
     token: Arc<CancellationToken>,
 }
 
 impl UserController {
-    pub fn new(id: u64, token: Arc<CancellationToken>) -> Self {
-        Self { id, token }
-    }
-
-    pub fn get_id(&self) -> u64 {
-        self.id
+    pub fn new(token: Arc<CancellationToken>) -> Self {
+        Self { token }
     }
 
     pub fn stop(&self) {

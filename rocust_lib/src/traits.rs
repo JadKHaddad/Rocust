@@ -25,9 +25,9 @@ pub trait HasTask: 'static {
 pub trait User: Send + Sized + 'static {
     type Shared: Shared;
 
-    async fn new(_test_config: &TestConfig, _data: &Data, _shared: Self::Shared) -> Self;
-    async fn on_start(&mut self, _data: &Data) {}
-    async fn on_stop(&mut self, _data: &Data) {}
+    async fn new(_test_config: &TestConfig, _data: &Context, _shared: Self::Shared) -> Self;
+    async fn on_start(&mut self, _data: &Context) {}
+    async fn on_stop(&mut self, _data: &Context) {}
 }
 
 #[async_trait]
@@ -48,7 +48,7 @@ where
 
 use rand::{distributions::WeightedIndex, prelude::Distribution};
 
-use crate::{data::Data, test_config::TestConfig};
+use crate::{context::Context, test_config::TestConfig};
 
 impl<T> PrioritisedRandom<T> for Vec<T>
 where
