@@ -4,8 +4,7 @@ use rocust::{
     rocust_lib::{
         context::Context,
         run,
-        test::Test,
-        test_config::TestConfig,
+        test::{test_config::TestConfig, Test},
         traits::{Shared, User},
     },
     rocust_macros::has_task,
@@ -129,10 +128,10 @@ struct MyUser2 {}
 
 #[has_task(min_sleep = 1, max_sleep = 1, weight = 1)]
 impl MyUser2 {
-    // #[task(priority = 1)]
-    // async fn suicide(&mut self, context: &Context) {
-    //     context.stop();
-    // }
+    #[task(priority = 1)]
+    async fn suicide(&mut self, context: &Context) {
+        context.stop();
+    }
 }
 
 #[async_trait]
@@ -165,7 +164,7 @@ async fn main() {
         Some(30),
         2,
         true,
-        false,
+        true,
         Some(tracing::level_filters::LevelFilter::INFO),
         Some(String::from("results/log.log")),
         Some(String::from("results/current_results.csv")),

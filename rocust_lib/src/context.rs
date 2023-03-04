@@ -1,5 +1,6 @@
 use crate::{
-    events::EventsHandler, results::AllResults, test::TestController, user::UserController,
+    events::EventsHandler, results::AllResults, test::test_controller::TestController,
+    user::UserController,
 };
 use std::{sync::Arc, time::Duration};
 

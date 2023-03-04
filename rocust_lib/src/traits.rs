@@ -48,7 +48,7 @@ where
 
 use rand::{distributions::WeightedIndex, prelude::Distribution};
 
-use crate::{context::Context, test_config::TestConfig};
+use crate::{context::Context, test::test_config::TestConfig};
 
 impl<T> PrioritisedRandom<T> for Vec<T>
 where

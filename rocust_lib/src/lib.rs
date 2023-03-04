@@ -1,18 +1,16 @@
 // TODO: capsule modules
 pub mod context;
 pub mod events;
+pub(crate) mod fs;
 pub(crate) mod logging;
 pub(crate) mod messages;
-pub(crate) mod reader;
 pub mod results;
 pub(crate) mod server;
 pub mod tasks;
 pub mod test;
-pub mod test_config;
 pub mod traits;
 pub(crate) mod user;
 pub(crate) mod utils;
-pub(crate) mod writer;
 
 #[macro_export]
 macro_rules! run {

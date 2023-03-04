@@ -1,4 +1,4 @@
-use crate::{results::AllResults, test::TestController};
+use crate::{results::AllResults, test::test_controller::TestController};
 use axum::{extract::State, response::IntoResponse, routing::get, Json, Router};
 use hyper::{Error as HyperError, StatusCode};
 use std::{net::SocketAddr, sync::Arc};

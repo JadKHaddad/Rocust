@@ -1,15 +1,17 @@
+pub mod test_config;
+pub(crate) mod test_controller;
+
 use crate::{
     context::{Context, StopConditionData},
     events::EventsHandler,
+    fs::writer::Writer,
     logging::setup_logging,
     messages::{MainMessage, ResultMessage},
     results::AllResults,
     server::Server,
-    test_config::TestConfig,
     traits::{HasTask, PrioritisedRandom, Shared, User},
     user::{EventsUserInfo, UserController, UserStatsCollection, UserStatus},
     utils::get_timestamp_as_millis_as_string,
-    writer::Writer,
 };
 use rand::Rng;
 use std::{sync::Arc, time::Duration};
@@ -22,25 +24,7 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use tracing_appender::non_blocking::WorkerGuard;
 
-#[derive(Clone)]
-pub struct TestController {
-    token: Arc<CancellationToken>,
-}
-
-impl TestController {
-    pub fn new(token: Arc<CancellationToken>) -> Self {
-        TestController { token }
-    }
-
-    pub fn stop(&self) {
-        tracing::info!("Stopping test");
-        self.token.cancel();
-    }
-
-    pub(crate) async fn cancelled(&self) {
-        self.token.cancelled().await
-    }
-}
+use self::{test_config::TestConfig, test_controller::TestController};
 
 pub struct Test {
     test_config: TestConfig,
