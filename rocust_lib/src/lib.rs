@@ -1,3 +1,4 @@
+// TODO: capsule modules
 pub mod context;
 pub mod events;
 pub(crate) mod logging;

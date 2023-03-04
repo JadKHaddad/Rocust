@@ -12,6 +12,7 @@ use thiserror::Error as ThisError;
 use toml::de::Error as TomlDeError;
 use tracing::level_filters::LevelFilter;
 
+// TODO: add option for test summary file and maybe other formats for all files
 #[derive(Clone)]
 pub struct TestConfig {
     pub user_count: u64,
