@@ -22,8 +22,8 @@ impl<T> AsyncTask<T> {
         self.priority
     }
 
-    pub async fn call(&self, user: &mut T, data: &Context) {
-        (self.func)(user, data).await;
+    pub async fn call(&self, user: &mut T, context: &Context) {
+        (self.func)(user, context).await;
     }
 }
 
