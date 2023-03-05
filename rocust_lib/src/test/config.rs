@@ -12,7 +12,6 @@ use thiserror::Error as ThisError;
 use toml::de::Error as TomlDeError;
 use tracing::level_filters::LevelFilter;
 
-// TODO: add option for test summary file and maybe other formats for all files
 #[derive(Clone)]
 pub struct TestConfig {
     pub user_count: u64,
@@ -25,6 +24,7 @@ pub struct TestConfig {
     pub log_file: Option<String>,
     pub current_results_file: Option<String>,
     pub results_history_file: Option<String>,
+    pub summary_file: Option<String>,
     pub server_address: Option<SocketAddr>,
     pub additional_args: Vec<String>,
     // a stop condiction will be checked at the end of every update interval and will stop the test if it returns true
@@ -43,6 +43,7 @@ impl TestConfig {
         log_file: Option<String>,
         current_results_file: Option<String>,
         results_history_file: Option<String>,
+        summary_file: Option<String>,
         server_address: Option<SocketAddr>,
         additional_args: Vec<String>,
         stop_condition: Option<fn(StopConditionData) -> bool>,
@@ -58,6 +59,7 @@ impl TestConfig {
             log_file,
             current_results_file,
             results_history_file,
+            summary_file,
             server_address,
             additional_args,
             stop_condition,
@@ -143,6 +145,7 @@ impl TryFrom<ExternalTestConfig> for TestConfig {
             log_file: external_test_config.log_file,
             current_results_file: external_test_config.current_results_file,
             results_history_file: external_test_config.results_history_file,
+            summary_file: external_test_config.summary_file,
             server_address,
             additional_args: external_test_config.additional_arg,
             stop_condition: None,
@@ -193,6 +196,10 @@ struct ExternalTestConfig {
     /// Path to the file where the results history should be written to. If not set, the results will not be written to a file.
     #[arg(long, default_value = None)]
     results_history_file: Option<String>,
+
+    /// Path to the file where the summary should be written to. If not set, the summary will not be written to a file.
+    #[arg(long, default_value = None)]
+    summary_file: Option<String>,
 
     /// Address for the server to listen on. If not set, the server will not be started.
     #[arg(long, default_value = None)]

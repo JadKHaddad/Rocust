@@ -1,6 +1,6 @@
 use csv::{Error as CsvError, IntoInnerError as CsvIntoInnerError, Writer as CsvWriter};
 use prettytable::{row, Cell, Row, Table};
-use serde::Serialize;
+use serde::{ser::SerializeStruct, Serialize};
 use std::{collections::HashMap, string::FromUtf8Error, time::Duration};
 use thiserror::Error as ThisError;
 
@@ -112,6 +112,31 @@ impl Results {
     pub fn get_failed_requests_per_second(&self) -> f64 {
         self.failed_requests_per_second
     }
+
+    fn into_summary_results(self, endpoint_type_name: EndpointTypeName) -> SummaryResults {
+        SummaryResults {
+            endpoint_type_name,
+            results: self,
+        }
+    }
+}
+#[derive(Debug, Clone)]
+pub(crate) struct SummaryResults {
+    endpoint_type_name: EndpointTypeName,
+    results: Results,
+}
+
+impl Serialize for SummaryResults {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("SummaryResults", 3)?;
+        state.serialize_field("type", &self.endpoint_type_name.0)?;
+        state.serialize_field("name", &self.endpoint_type_name.1)?;
+        state.serialize_field("results", &self.results)?;
+        state.end()
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
@@ -125,6 +150,12 @@ impl Serialize for EndpointTypeName {
         let type_name = format!("{}${}", self.0, self.1);
         serializer.serialize_str(&type_name)
     }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct SummaryAllResults {
+    aggrigated_results: Results,
+    endpoint_results: Vec<SummaryResults>,
 }
 
 #[derive(Debug, Default, Clone, Serialize)]
@@ -330,5 +361,18 @@ impl AllResults {
 
     pub fn get_endpoint_results(&self) -> &HashMap<EndpointTypeName, Results> {
         &self.endpoint_results
+    }
+
+    pub(crate) fn into_summary_all_results(self) -> SummaryAllResults {
+        SummaryAllResults {
+            aggrigated_results: self.aggrigated_results,
+            endpoint_results: self
+                .endpoint_results
+                .into_iter()
+                .map(|(endpoint_type_name, results)| {
+                    results.into_summary_results(endpoint_type_name)
+                })
+                .collect(),
+        }
     }
 }

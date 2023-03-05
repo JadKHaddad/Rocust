@@ -1,10 +1,17 @@
 pub mod context;
 
-use crate::results::{AllResults, EndpointTypeName};
+use crate::results::{AllResults, EndpointTypeName, SummaryAllResults};
+use serde::Serialize;
+use serde_json::Error as SerdeJsonError;
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio_util::sync::CancellationToken;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
+struct SummaryUserStatsCollection {
+    user_stats_vec: Vec<SummaryUserStats>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct UserStatsCollection {
     user_stats_map: HashMap<u64, UserStats>,
 }
@@ -77,9 +84,30 @@ impl UserStatsCollection {
             user_stats.user_info.total_tasks += 1;
         }
     }
+
+    pub(crate) fn json_string(&self) -> Result<String, SerdeJsonError> {
+        let summary_user_stats_collection = self.clone().into_summary_user_stats_collection();
+        serde_json::to_string(&summary_user_stats_collection)
+    }
+
+    fn into_summary_user_stats_collection(self) -> SummaryUserStatsCollection {
+        SummaryUserStatsCollection {
+            user_stats_vec: self
+                .user_stats_map
+                .into_iter()
+                .map(|(_, user_stats)| user_stats.into_summary_user_stats())
+                .collect(),
+        }
+    }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
+struct SummaryUserStats {
+    user_info: UserStatsInfo,
+    all_results: SummaryAllResults,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct UserStats {
     pub user_info: UserStatsInfo,
     pub all_results: AllResults,
@@ -92,9 +120,16 @@ impl UserStats {
             all_results,
         }
     }
+
+    fn into_summary_user_stats(self) -> SummaryUserStats {
+        SummaryUserStats {
+            user_info: self.user_info,
+            all_results: self.all_results.into_summary_all_results(),
+        }
+    }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum UserStatus {
     Finished,
     Spawned,
@@ -103,7 +138,7 @@ pub enum UserStatus {
     Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct UserStatsInfo {
     pub id: u64,
     pub name: String,

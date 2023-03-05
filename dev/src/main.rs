@@ -156,7 +156,7 @@ async fn main() {
     let test_config = TestConfig::new(
         20,
         1,
-        Some(30),
+        Some(5),
         2,
         true,
         true,
@@ -164,6 +164,7 @@ async fn main() {
         Some(String::from("results/log.log")),
         Some(String::from("results/current_results.csv")),
         Some(String::from("results/results_history.csv")),
+        Some(String::from("results/summary.json")),
         Some(SocketAddr::from(([127, 0, 0, 1], 3000))),
         // additional args, will be provided via CLI
         vec![],
@@ -183,7 +184,7 @@ async fn main() {
     );
 
     // or get test config from CLI. stop_condition will be ignored for now (will be implemented later)
-    // cargo run -p dev -- --user-count 20 --users-per-sec 4 --runtime 60 --update-interval-in-secs 3 --log-level "debug" --log-file "results/log.log" --current-results-file "results/current_results.csv" --results-history-file "results/results_history.csv" --server-address "127.0.0.1:8080" --additional-arg "arg1" --additional-arg "arg2"
+    // cargo run -p dev -- --user-count 20 --users-per-sec 4 --runtime 60 --update-interval-in-secs 3 --log-level "debug" --log-file "results/log.log" --current-results-file "results/current_results.csv" --results-history-file "results/results_history.csv" --summary-file "results/summary.json" --server-address "127.0.0.1:8080" --additional-arg "arg1" --additional-arg "arg2"
     //let test_config = TestConfig::from_cli_args().expect("Failed to get test config from CLI args");
 
     let mut test = Test::new(test_config).await;

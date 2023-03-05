@@ -34,6 +34,7 @@ pub struct Test {
     token: Arc<CancellationToken>,
     current_results_writer: Option<Writer>,
     results_history_writer: Option<Writer>,
+    summary_writer: Option<Writer>,
     total_users_spawned_arc_rwlock: Arc<RwLock<u64>>,
     all_results_arc_rwlock: Arc<RwLock<AllResults>>,
     user_stats_collection: UserStatsCollection,
@@ -92,11 +93,23 @@ impl Test {
         } else {
             None
         };
+        let summary_writer = if let Some(summary_file) = &test_config.summary_file {
+            match Writer::from_str(summary_file).await {
+                Ok(writer) => Some(writer),
+                Err(e) => {
+                    tracing::error!("Failed to create writer for summary file: [{}]", e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
         Test {
             test_config,
             token: Arc::new(CancellationToken::new()),
             current_results_writer,
             results_history_writer,
+            summary_writer,
             total_users_spawned_arc_rwlock: Arc::new(RwLock::new(0)),
             all_results_arc_rwlock: Arc::new(RwLock::new(AllResults::default())),
             user_stats_collection: UserStatsCollection::new(),
@@ -533,14 +546,30 @@ impl Test {
         }
         tracing::debug!("Timer finished");
 
-        tracing::info!("Test finished");
+        self.write_summary_to_file().await;
 
-        // TODO: serialize it to a file
-        let elapsed_time =
-            Test::calculate_elapsed_time(&*self.start_timestamp_arc_rwlock.read().await);
-        self.user_stats_collection
-            .calculate_per_second(&elapsed_time);
-        println!("{:#?}", self.user_stats_collection);
+        tracing::info!("Test finished");
+    }
+
+    async fn write_summary_to_file(&mut self) {
+        if let Some(summary_writer) = &self.summary_writer {
+            tracing::info!("Writing summary to file");
+            let elapsed_time =
+                Test::calculate_elapsed_time(&*self.start_timestamp_arc_rwlock.read().await);
+            self.user_stats_collection
+                .calculate_per_second(&elapsed_time);
+
+            match self.user_stats_collection.json_string() {
+                Ok(summary_string) => {
+                    if let Err(e) = summary_writer.write_all(summary_string.as_bytes()).await {
+                        tracing::error!("Error writing summary to file: {}", e);
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Error serializing summary: {}", e);
+                }
+            }
+        }
     }
 }
 
