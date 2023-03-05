@@ -1,7 +1,7 @@
 use crate::{
-    context::StopConditionData,
     fs::reader::{CreateError, ReadError, Reader},
     logging::{parse_log_level, LogLevelError},
+    test::controller::StopConditionData,
 };
 use clap::Parser;
 use serde::{Deserialize, Serialize};

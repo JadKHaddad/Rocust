@@ -1,12 +1,7 @@
 use async_trait::async_trait;
 use reqwest::Client;
 use rocust::{
-    rocust_lib::{
-        context::Context,
-        run,
-        test::{test_config::TestConfig, Test},
-        traits::{Shared, User},
-    },
+    rocust_lib::{run, Context, Shared, Test, TestConfig, User},
     rocust_macros::has_task,
 };
 use std::{net::SocketAddr, sync::Arc};

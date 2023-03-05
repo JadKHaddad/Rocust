@@ -1,8 +1,5 @@
-use crate::{
-    events::EventsHandler, results::AllResults, test::test_controller::TestController,
-    user::UserController,
-};
-use std::{sync::Arc, time::Duration};
+use crate::{events::EventsHandler, test::controller::TestController, test::user::UserController};
+use std::sync::Arc;
 
 pub struct Context {
     // each user will recieve a Data obj containing
@@ -60,27 +57,5 @@ impl Context {
 
     pub fn get_id(&self) -> u64 {
         self.events_handler.get_user_id()
-    }
-}
-
-pub struct StopConditionData<'a> {
-    all_results: &'a AllResults,
-    elapsed_time: &'a Duration,
-}
-
-impl<'a> StopConditionData<'a> {
-    pub fn new(all_results: &'a AllResults, elapsed_time: &'a Duration) -> Self {
-        Self {
-            all_results,
-            elapsed_time,
-        }
-    }
-
-    pub fn get_all_results(&self) -> &AllResults {
-        self.all_results
-    }
-
-    pub fn get_elapsed_time(&self) -> &Duration {
-        self.elapsed_time
     }
 }

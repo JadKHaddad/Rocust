@@ -1,8 +1,8 @@
-pub mod test_config;
-pub(crate) mod test_controller;
+pub mod config;
+pub(crate) mod controller;
+pub mod user;
 
 use crate::{
-    context::{Context, StopConditionData},
     events::EventsHandler,
     fs::writer::Writer,
     logging::setup_logging,
@@ -10,7 +10,6 @@ use crate::{
     results::AllResults,
     server::Server,
     traits::{HasTask, PrioritisedRandom, Shared, User},
-    user::{EventsUserInfo, UserController, UserStatsCollection, UserStatus},
     utils::get_timestamp_as_millis_as_string,
 };
 use rand::Rng;
@@ -24,7 +23,11 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 use tracing_appender::non_blocking::WorkerGuard;
 
-use self::{test_config::TestConfig, test_controller::TestController};
+use self::{
+    config::TestConfig,
+    controller::{StopConditionData, TestController},
+    user::{context::Context, EventsUserInfo, UserController, UserStatsCollection, UserStatus},
+};
 
 pub struct Test {
     test_config: TestConfig,

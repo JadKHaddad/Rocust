@@ -1,5 +1,3 @@
-// TODO: capsule modules
-pub mod context;
 pub mod events;
 pub(crate) mod fs;
 pub(crate) mod logging;
@@ -11,6 +9,9 @@ pub mod test;
 pub mod traits;
 pub(crate) mod user;
 pub(crate) mod utils;
+
+pub use test::{config::TestConfig, user::context::Context, Test};
+pub use traits::{Shared, User};
 
 #[macro_export]
 macro_rules! run {

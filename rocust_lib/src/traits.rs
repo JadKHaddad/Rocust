@@ -1,4 +1,6 @@
+use crate::{test::config::TestConfig, test::user::context::Context};
 use async_trait::async_trait;
+use rand::{distributions::WeightedIndex, prelude::Distribution};
 
 pub trait HasTask: 'static {
     fn get_async_tasks() -> Vec<crate::tasks::AsyncTask<Self>>
@@ -45,10 +47,6 @@ where
 {
     fn get_prioritised_random(&self) -> Option<&T>;
 }
-
-use rand::{distributions::WeightedIndex, prelude::Distribution};
-
-use crate::{context::Context, test::test_config::TestConfig};
 
 impl<T> PrioritisedRandom<T> for Vec<T>
 where

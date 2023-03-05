@@ -4,7 +4,7 @@ use crate::{
         TaskExecutedMessage, UserSelfStoppedMessage, UserSpawnedMessage,
     },
     results::EndpointTypeName,
-    user::EventsUserInfo,
+    test::user::EventsUserInfo,
 };
 use tokio::sync::mpsc::UnboundedSender;
 

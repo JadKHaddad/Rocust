@@ -1,4 +1,4 @@
-use crate::{results::EndpointTypeName, user::EventsUserInfo};
+use crate::{results::EndpointTypeName, test::user::EventsUserInfo};
 
 pub enum MainMessage {
     ResultMessage(ResultMessage),
