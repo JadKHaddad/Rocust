@@ -86,21 +86,21 @@ impl UserStatsCollection {
     }
 
     pub(crate) fn json_string(&self) -> Result<String, SerdeJsonError> {
-        let summary_user_stats_collection = self.clone().into_summary_user_stats_collection();
-        serde_json::to_string(&summary_user_stats_collection)
-    }
-
-    fn into_summary_user_stats_collection(self) -> SummaryUserStatsCollection {
-        SummaryUserStatsCollection {
-            user_stats_vec: self
-                .user_stats_map
-                .into_iter()
-                .map(|(_, user_stats)| user_stats.into_summary_user_stats())
-                .collect(),
-        }
+        let summary_user_stats_collection: SummaryUserStatsCollection = self.clone().into();
+        serde_json::to_string(&summary_user_stats_collection.user_stats_vec)
     }
 }
 
+impl Into<SummaryUserStatsCollection> for UserStatsCollection {
+    fn into(self) -> SummaryUserStatsCollection {
+        let user_stats_vec = self
+            .user_stats_map
+            .into_iter()
+            .map(|(_, user_stats)| user_stats.into())
+            .collect();
+        SummaryUserStatsCollection { user_stats_vec }
+    }
+}
 #[derive(Debug, Clone, Serialize)]
 struct SummaryUserStats {
     user_info: UserStatsInfo,
@@ -120,15 +120,16 @@ impl UserStats {
             all_results,
         }
     }
+}
 
-    fn into_summary_user_stats(self) -> SummaryUserStats {
+impl Into<SummaryUserStats> for UserStats {
+    fn into(self) -> SummaryUserStats {
         SummaryUserStats {
             user_info: self.user_info,
-            all_results: self.all_results.into_summary_all_results(),
+            all_results: self.all_results.into(),
         }
     }
 }
-
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum UserStatus {
     Finished,

@@ -120,6 +120,7 @@ impl Results {
         }
     }
 }
+
 #[derive(Debug, Clone)]
 pub(crate) struct SummaryResults {
     endpoint_type_name: EndpointTypeName,
@@ -362,17 +363,19 @@ impl AllResults {
     pub fn get_endpoint_results(&self) -> &HashMap<EndpointTypeName, Results> {
         &self.endpoint_results
     }
+}
 
-    pub(crate) fn into_summary_all_results(self) -> SummaryAllResults {
+impl Into<SummaryAllResults> for AllResults {
+    fn into(self) -> SummaryAllResults {
+        let aggrigated_results = self.aggrigated_results;
+        let endpoint_results = self
+            .endpoint_results
+            .into_iter()
+            .map(|(endpoint_type_name, results)| results.into_summary_results(endpoint_type_name))
+            .collect();
         SummaryAllResults {
-            aggrigated_results: self.aggrigated_results,
-            endpoint_results: self
-                .endpoint_results
-                .into_iter()
-                .map(|(endpoint_type_name, results)| {
-                    results.into_summary_results(endpoint_type_name)
-                })
-                .collect(),
+            aggrigated_results,
+            endpoint_results,
         }
     }
 }
