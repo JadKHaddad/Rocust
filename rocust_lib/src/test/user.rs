@@ -3,7 +3,9 @@ pub mod context;
 use crate::results::{AllResults, EndpointTypeName, SummaryAllResults};
 use serde::Serialize;
 use serde_json::Error as SerdeJsonError;
+use serde_yaml::Error as SerdeYamlError;
 use std::{collections::HashMap, sync::Arc, time::Duration};
+use thiserror::Error as ThisError;
 use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Clone, Serialize)]
@@ -14,6 +16,15 @@ struct SummaryUserStatsCollection {
 #[derive(Debug, Clone, Serialize)]
 pub struct UserStatsCollection {
     user_stats_map: HashMap<u64, UserStats>,
+}
+
+#[derive(Debug, ThisError)]
+pub enum UserStatsCollectionError {
+    #[error("Error converting to json: {0}")]
+    SerdeJsonError(#[from] SerdeJsonError),
+
+    #[error("Error converting to yaml: {0}")]
+    SerdeYamlError(#[from] SerdeYamlError),
 }
 
 impl UserStatsCollection {
@@ -85,9 +96,18 @@ impl UserStatsCollection {
         }
     }
 
-    pub(crate) fn json_string(&self) -> Result<String, SerdeJsonError> {
+    pub(crate) fn json_string(&self) -> Result<String, UserStatsCollectionError> {
         let summary_user_stats_collection: SummaryUserStatsCollection = self.clone().into();
-        serde_json::to_string(&summary_user_stats_collection.user_stats_vec)
+        Ok(serde_json::to_string(
+            &summary_user_stats_collection.user_stats_vec,
+        )?)
+    }
+
+    pub(crate) fn yaml_string(&self) -> Result<String, UserStatsCollectionError> {
+        let summary_user_stats_collection: SummaryUserStatsCollection = self.clone().into();
+        Ok(serde_yaml::to_string(
+            &summary_user_stats_collection.user_stats_vec,
+        )?)
     }
 }
 

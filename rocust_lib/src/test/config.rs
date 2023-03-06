@@ -9,7 +9,6 @@ use serde_json::{self, Error as SerdeJsonError};
 use serde_yaml::{self, Error as SerdeYamlError};
 use std::net::{AddrParseError, SocketAddr};
 use thiserror::Error as ThisError;
-use toml::de::Error as TomlDeError;
 use tracing::level_filters::LevelFilter;
 
 #[derive(Clone)]
@@ -93,17 +92,6 @@ impl TestConfig {
         Ok(TestConfig::from_yaml_string(&yaml_string)?)
     }
 
-    pub fn from_toml_string(toml_string: &str) -> Result<Self, FromTomlError> {
-        let external_test_config = toml::from_str::<ExternalTestConfig>(toml_string)?;
-        Ok(TestConfig::try_from(external_test_config)?)
-    }
-
-    pub async fn from_toml_file(toml_file_path: &str) -> Result<Self, FromTomlFileError> {
-        let reader = Reader::from_str(toml_file_path).await?;
-        let toml_string = reader.read_all_to_string().await?;
-        Ok(TestConfig::from_toml_string(&toml_string)?)
-    }
-
     pub async fn from_file(file_path: &str) -> Self {
         //TODO: get file extension and call the corresponding function
         //TODO: if file extension is not supported, try to parse it as json, yaml or toml or return an error
@@ -153,6 +141,31 @@ impl TryFrom<ExternalTestConfig> for TestConfig {
     }
 }
 
+pub enum SupportedExtension {
+    Json,
+    Yaml,
+}
+
+impl SupportedExtension {
+    pub fn from_str(extension: &str) -> Result<Self, UnsupportedExtension> {
+        match extension {
+            "json" => Ok(Self::Json),
+            "yaml" => Ok(Self::Yaml),
+            "yml" => Ok(Self::Yaml),
+            _ => Err(UnsupportedExtension),
+        }
+    }
+}
+
+#[derive(Debug, ThisError)]
+pub struct UnsupportedExtension;
+
+impl std::fmt::Display for UnsupportedExtension {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Unsupported extension")
+    }
+}
+
 /// ROCUST
 #[derive(Parser, Debug, Clone, Serialize, Deserialize)]
 #[command(author, version, about, long_about = None)]
@@ -185,19 +198,19 @@ struct ExternalTestConfig {
     #[arg(long, default_value = None)]
     log_level: Option<String>,
 
-    /// Path to the file where the log should be written to. If not set, the log will not be written to a file.
+    /// Path to the file where the log should be written to. If not set, the log will not be written to a file. Extension .log
     #[arg(long, default_value = None)]
     log_file: Option<String>,
 
-    /// Path to the file where the current results should be written to. If not set, the results will not be written to a file.
+    /// Path to the file where the current results should be written to. If not set, the results will not be written to a file. Extension .csv
     #[arg(long, default_value = None)]
     current_results_file: Option<String>,
 
-    /// Path to the file where the results history should be written to. If not set, the results will not be written to a file.
+    /// Path to the file where the results history should be written to. If not set, the results will not be written to a file. Extension .csv
     #[arg(long, default_value = None)]
     results_history_file: Option<String>,
 
-    /// Path to the file where the summary should be written to. If not set, the summary will not be written to a file.
+    /// Path to the file where the summary should be written to. If not set, the summary will not be written to a file. Extension .json or .yaml/.yml
     #[arg(long, default_value = None)]
     summary_file: Option<String>,
 
@@ -260,17 +273,7 @@ pub enum FromYamlFileError {
 }
 
 #[derive(Debug, ThisError)]
-pub enum FromTomlError {
-    #[error("Error while parsing toml: {0}")]
-    SerdeTomlError(#[from] TomlDeError),
-    #[error("Error while converting to TestConfig: {0}")]
-    ConversionError(#[from] FromExternalTestConfigError),
-}
-
-#[derive(Debug, ThisError)]
 pub enum FromTomlFileError {
-    #[error("Error while parsing toml file: {0}")]
-    FromToml(#[from] FromTomlError),
     #[error("Error while reading toml file: {0}")]
     ReadError(#[from] ReadError),
     #[error("Error while creating reader: {0}")]

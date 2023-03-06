@@ -6,7 +6,7 @@ use tokio::{
 };
 
 #[derive(Clone)]
-pub struct Writer {
+pub(crate) struct Writer {
     path: PathBuf,
 }
 
@@ -36,6 +36,10 @@ impl Writer {
             .await?;
         file.write_all(data).await?;
         Ok(())
+    }
+
+    pub fn get_path(&self) -> &PathBuf {
+        &self.path
     }
 }
 

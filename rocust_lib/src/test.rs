@@ -9,8 +9,9 @@ use crate::{
     messages::{MainMessage, ResultMessage},
     results::AllResults,
     server::Server,
+    test::config::SupportedExtension,
     traits::{HasTask, PrioritisedRandom, Shared, User},
-    utils::get_timestamp_as_millis_as_string,
+    utils::{get_extension_from_filename, get_timestamp_as_millis_as_string},
 };
 use rand::Rng;
 use std::{sync::Arc, time::Duration};
@@ -559,7 +560,15 @@ impl Test {
             self.user_stats_collection
                 .calculate_per_second(&elapsed_time);
 
-            match self.user_stats_collection.json_string() {
+            let extension = SupportedExtension::from_str(
+                get_extension_from_filename(summary_writer.get_path()).unwrap_or(""),
+            )
+            .unwrap_or(SupportedExtension::Json);
+            let summary_string = match extension {
+                SupportedExtension::Yaml => self.user_stats_collection.yaml_string(),
+                SupportedExtension::Json => self.user_stats_collection.json_string(),
+            };
+            match summary_string {
                 Ok(summary_string) => {
                     if let Err(e) = summary_writer.write_all(summary_string.as_bytes()).await {
                         tracing::error!("Error writing summary to file: {}", e);

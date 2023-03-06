@@ -164,7 +164,7 @@ async fn main() {
         Some(String::from("results/log.log")),
         Some(String::from("results/current_results.csv")),
         Some(String::from("results/results_history.csv")),
-        Some(String::from("results/summary.json")),
+        Some(String::from("results/summary.yaml")),
         Some(SocketAddr::from(([127, 0, 0, 1], 3000))),
         // additional args, will be provided via CLI
         vec![],
