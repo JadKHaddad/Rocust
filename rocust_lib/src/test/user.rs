@@ -67,7 +67,7 @@ impl UserStatsCollection {
         &mut self,
         user_id: &u64,
         endpoint_type_name: &EndpointTypeName,
-        error: &String,
+        error: &str,
     ) {
         if let Some(user_stats) = self.user_stats_map.get_mut(user_id) {
             user_stats.all_results.add_error(endpoint_type_name, error);
@@ -111,16 +111,23 @@ impl UserStatsCollection {
     }
 }
 
-impl Into<SerUserStatsCollection> for UserStatsCollection {
-    fn into(self) -> SerUserStatsCollection {
-        let user_stats_vec = self
+impl Default for UserStatsCollection {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl From<UserStatsCollection> for SerUserStatsCollection {
+    fn from(user_stats_collection: UserStatsCollection) -> Self {
+        let user_stats_vec = user_stats_collection
             .user_stats_map
-            .into_iter()
-            .map(|(_, user_stats)| user_stats.into())
+            .into_values()
+            .map(|user_stats| user_stats.into())
             .collect();
         SerUserStatsCollection { user_stats_vec }
     }
 }
+
 #[derive(Debug, Clone, Serialize)]
 struct SerUserStats {
     user_info: UserStatsInfo,
@@ -142,14 +149,15 @@ impl UserStats {
     }
 }
 
-impl Into<SerUserStats> for UserStats {
-    fn into(self) -> SerUserStats {
-        SerUserStats {
-            user_info: self.user_info,
-            all_results: self.all_results.into(),
+impl From<UserStats> for SerUserStats {
+    fn from(user_stats: UserStats) -> Self {
+        Self {
+            user_info: user_stats.user_info,
+            all_results: user_stats.all_results.into(),
         }
     }
 }
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum UserStatus {
     Finished,

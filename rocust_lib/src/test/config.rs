@@ -67,7 +67,7 @@ impl TestConfig {
 
     pub fn from_cli_args() -> Result<Self, FromExternalTestConfigError> {
         let external_test_config = ExternalTestConfig::parse();
-        Ok(TestConfig::try_from(external_test_config)?)
+        TestConfig::try_from(external_test_config)
     }
 
     pub fn from_json_string(json_string: &str) -> Result<Self, FromJsonError> {
@@ -146,9 +146,11 @@ pub enum SupportedExtension {
     Yaml,
 }
 
-impl SupportedExtension {
-    pub fn from_str(extension: &str) -> Result<Self, UnsupportedExtension> {
-        match extension {
+impl std::str::FromStr for SupportedExtension {
+    type Err = UnsupportedExtension;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
             "json" => Ok(Self::Json),
             "yaml" => Ok(Self::Yaml),
             "yml" => Ok(Self::Yaml),

@@ -14,7 +14,7 @@ use crate::{
     utils::{get_extension_from_filename, get_timestamp_as_millis_as_string},
 };
 use rand::Rng;
-use std::{sync::Arc, time::Duration};
+use std::{str::FromStr, sync::Arc, time::Duration};
 use tokio::{
     io::{self, AsyncWriteExt},
     sync::{mpsc, RwLock},
@@ -185,7 +185,7 @@ impl Test {
             let mut users_spawned = 0;
             for i in 0..count {
                 let test_config = test_config.clone();
-                let id = i as u64 + starting_index;
+                let id = i + starting_index;
 
                 // these are the tokens for the test
                 let test_token_for_user = token.clone();
@@ -194,7 +194,7 @@ impl Test {
                 // create a user token for the UserController
                 let user_token = Arc::new(CancellationToken::new());
                 let user_controller = UserController::new(user_token.clone());
-                let user_info = EventsUserInfo::new(id.clone(), T::get_name());
+                let user_info = EventsUserInfo::new(id, T::get_name());
                 let events_handler = EventsHandler::new(user_info, results_tx.clone());
 
                 // create the data for the user
@@ -396,7 +396,7 @@ impl Test {
 
                         // check stop condition and stop if needed
                         if let Some(stop_condition) = &test_config.stop_condition {
-                            let stop_condition_data = StopConditionData::new(&*all_results_gaurd, &elapsed_time);
+                            let stop_condition_data = StopConditionData::new(&all_results_gaurd, &elapsed_time);
                             if stop_condition(stop_condition_data) {
                                 tracing::info!("Stop condition met");
                                 token.cancel();

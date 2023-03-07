@@ -14,7 +14,7 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
 
     for attr in attrs {
         if let syn::NestedMeta::Meta(syn::Meta::NameValue(name_value)) = attr {
-            if name_value.path.get_ident().unwrap().to_string() == "min_sleep" {
+            if *name_value.path.get_ident().unwrap() == "min_sleep" {
                 if let syn::Lit::Int(lit_str) = name_value.lit {
                     min_sleep = match lit_str.base10_digits().parse::<u64>() {
                         Ok(val) => val,
@@ -23,7 +23,7 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
                 } else {
                     panic!("min_sleep has to be an integer");
                 }
-            } else if name_value.path.get_ident().unwrap().to_string() == "max_sleep" {
+            } else if *name_value.path.get_ident().unwrap() == "max_sleep" {
                 if let syn::Lit::Int(lit_str) = name_value.lit {
                     max_sleep = match lit_str.base10_digits().parse::<u64>() {
                         Ok(val) => val,
@@ -32,7 +32,7 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
                 } else {
                     panic!("max_sleep has to be an integer");
                 }
-            } else if name_value.path.get_ident().unwrap().to_string() == "weight" {
+            } else if *name_value.path.get_ident().unwrap() == "weight" {
                 if let syn::Lit::Int(lit_str) = name_value.lit {
                     weight = match lit_str.base10_digits().parse::<u64>() {
                         Ok(val) => val,
@@ -86,7 +86,7 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
                     let mut iter = tokens.into_iter();
 
                     if let TokenTree::Ident(ident) = iter.next().expect("No ident found") {
-                        if ident.to_string() != "priority" {
+                        if ident != "priority" {
                             panic!("Only priority is supported");
                         }
                     } else {

@@ -4,7 +4,7 @@ use serde::{ser::SerializeStruct, Serialize};
 use std::{collections::HashMap, string::FromUtf8Error, time::Duration};
 use thiserror::Error as ThisError;
 
-const HEADERS: [&'static str; 11] = [
+const HEADERS: [&str; 11] = [
     "TYPE",
     "NAME",
     "TOTAL REQ",
@@ -18,7 +18,7 @@ const HEADERS: [&'static str; 11] = [
     "MAX RES TIME",
 ];
 
-const AGR_TYPE_NAME: [&'static str; 2] = ["", "AGR"];
+const AGR_TYPE_NAME: [&str; 2] = ["", "AGR"];
 
 #[derive(Debug, Default, Clone, Serialize)]
 pub struct Results {
@@ -173,7 +173,7 @@ impl AllResults {
         response_time: f64,
     ) {
         self.aggrigated_results.add_success(response_time);
-        if let Some(endpoint_results) = self.endpoint_results.get_mut(&endpoint_type_name) {
+        if let Some(endpoint_results) = self.endpoint_results.get_mut(endpoint_type_name) {
             endpoint_results.add_success(response_time);
         } else {
             let mut endpoint_results = Results::default();
@@ -185,7 +185,7 @@ impl AllResults {
 
     pub(crate) fn add_failure(&mut self, endpoint_type_name: &EndpointTypeName) {
         self.aggrigated_results.add_failure();
-        if let Some(endpoint_results) = self.endpoint_results.get_mut(&endpoint_type_name) {
+        if let Some(endpoint_results) = self.endpoint_results.get_mut(endpoint_type_name) {
             endpoint_results.add_failure();
         } else {
             let mut endpoint_results = Results::default();
@@ -195,9 +195,9 @@ impl AllResults {
         }
     }
 
-    pub(crate) fn add_error(&mut self, endpoint_type_name: &EndpointTypeName, _error: &String) {
+    pub(crate) fn add_error(&mut self, endpoint_type_name: &EndpointTypeName, _error: &str) {
         self.aggrigated_results.add_error();
-        if let Some(endpoint_results) = self.endpoint_results.get_mut(&endpoint_type_name) {
+        if let Some(endpoint_results) = self.endpoint_results.get_mut(endpoint_type_name) {
             endpoint_results.add_error();
         } else {
             let mut endpoint_results = Results::default();
@@ -227,7 +227,7 @@ impl AllResults {
         timestamp: &str,
     ) -> Result<String, CSVError> {
         let mut wtr = CsvWriter::from_writer(vec![]);
-        wtr.write_record(&[
+        wtr.write_record([
             timestamp,
             AGR_TYPE_NAME[0],
             AGR_TYPE_NAME[1],
@@ -251,9 +251,9 @@ impl AllResults {
 
     pub(crate) fn current_results_csv_string(&self) -> Result<String, CSVError> {
         let mut wtr = CsvWriter::from_writer(vec![]);
-        wtr.write_record(&HEADERS)?;
+        wtr.write_record(HEADERS)?;
         for (endpoint_type_name, results) in &self.endpoint_results {
-            wtr.write_record(&[
+            wtr.write_record([
                 &endpoint_type_name.0,
                 &endpoint_type_name.1,
                 &results.total_requests.to_string(),
@@ -267,7 +267,7 @@ impl AllResults {
                 &results.max_response_time.to_string(),
             ])?;
         }
-        wtr.write_record(&[
+        wtr.write_record([
             AGR_TYPE_NAME[0],
             AGR_TYPE_NAME[1],
             &self.aggrigated_results.total_requests.to_string(),
@@ -354,11 +354,10 @@ impl AllResults {
         &self.endpoint_results
     }
 }
-
-impl Into<SerAllResults> for AllResults {
-    fn into(self) -> SerAllResults {
-        let aggrigated_results = self.aggrigated_results;
-        let endpoint_results = self
+impl From<AllResults> for SerAllResults {
+    fn from(all_results: AllResults) -> SerAllResults {
+        let aggrigated_results = all_results.aggrigated_results;
+        let endpoint_results = all_results
             .endpoint_results
             .into_iter()
             .map(|(endpoint_type_name, results)| results.into_ser_results(endpoint_type_name))

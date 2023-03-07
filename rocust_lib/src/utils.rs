@@ -1,6 +1,6 @@
 use std::{
     ffi::OsStr,
-    path::PathBuf,
+    path::Path,
     time::{SystemTime, SystemTimeError, UNIX_EPOCH},
 };
 
@@ -14,6 +14,6 @@ pub(crate) fn get_timestamp_as_millis_as_string() -> Result<String, SystemTimeEr
     Ok(get_timestamp_as_millis()?.to_string())
 }
 
-pub(crate) fn get_extension_from_filename<'a>(filename: &'a PathBuf) -> Option<&'a str> {
+pub(crate) fn get_extension_from_filename(filename: &Path) -> Option<&str> {
     filename.extension().and_then(OsStr::to_str)
 }

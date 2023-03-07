@@ -5,10 +5,7 @@ pub fn test() {
     let code = "if x > 0 { 1 } else { 2 }";
     let expr = syn::parse_str::<Expr>(code).unwrap();
     println!("{:#?}", expr);
-    match &expr {
-        Expr::If(_) => {
-            println!("if");
-        }
-        _ => {}
+    if let Expr::If(_) = &expr {
+        println!("if");
     }
 }
