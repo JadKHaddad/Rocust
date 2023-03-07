@@ -1,6 +1,6 @@
 pub mod context;
 
-use crate::results::{AllResults, EndpointTypeName, SummaryAllResults};
+use crate::results::{AllResults, EndpointTypeName, SerAllResults};
 use serde::Serialize;
 use serde_json::Error as SerdeJsonError;
 use serde_yaml::Error as SerdeYamlError;
@@ -9,11 +9,11 @@ use thiserror::Error as ThisError;
 use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Clone, Serialize)]
-struct SummaryUserStatsCollection {
-    user_stats_vec: Vec<SummaryUserStats>,
+struct SerUserStatsCollection {
+    user_stats_vec: Vec<SerUserStats>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub struct UserStatsCollection {
     user_stats_map: HashMap<u64, UserStats>,
 }
@@ -97,37 +97,37 @@ impl UserStatsCollection {
     }
 
     pub(crate) fn json_string(&self) -> Result<String, UserStatsCollectionError> {
-        let summary_user_stats_collection: SummaryUserStatsCollection = self.clone().into();
+        let ser_user_stats_collection: SerUserStatsCollection = self.clone().into();
         Ok(serde_json::to_string(
-            &summary_user_stats_collection.user_stats_vec,
+            &ser_user_stats_collection.user_stats_vec,
         )?)
     }
 
     pub(crate) fn yaml_string(&self) -> Result<String, UserStatsCollectionError> {
-        let summary_user_stats_collection: SummaryUserStatsCollection = self.clone().into();
+        let ser_user_stats_collection: SerUserStatsCollection = self.clone().into();
         Ok(serde_yaml::to_string(
-            &summary_user_stats_collection.user_stats_vec,
+            &ser_user_stats_collection.user_stats_vec,
         )?)
     }
 }
 
-impl Into<SummaryUserStatsCollection> for UserStatsCollection {
-    fn into(self) -> SummaryUserStatsCollection {
+impl Into<SerUserStatsCollection> for UserStatsCollection {
+    fn into(self) -> SerUserStatsCollection {
         let user_stats_vec = self
             .user_stats_map
             .into_iter()
             .map(|(_, user_stats)| user_stats.into())
             .collect();
-        SummaryUserStatsCollection { user_stats_vec }
+        SerUserStatsCollection { user_stats_vec }
     }
 }
 #[derive(Debug, Clone, Serialize)]
-struct SummaryUserStats {
+struct SerUserStats {
     user_info: UserStatsInfo,
-    all_results: SummaryAllResults,
+    all_results: SerAllResults,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone)]
 pub struct UserStats {
     pub user_info: UserStatsInfo,
     pub all_results: AllResults,
@@ -142,9 +142,9 @@ impl UserStats {
     }
 }
 
-impl Into<SummaryUserStats> for UserStats {
-    fn into(self) -> SummaryUserStats {
-        SummaryUserStats {
+impl Into<SerUserStats> for UserStats {
+    fn into(self) -> SerUserStats {
+        SerUserStats {
             user_info: self.user_info,
             all_results: self.all_results.into(),
         }

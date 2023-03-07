@@ -113,8 +113,8 @@ impl Results {
         self.failed_requests_per_second
     }
 
-    fn into_summary_results(self, endpoint_type_name: EndpointTypeName) -> SummaryResults {
-        SummaryResults {
+    fn into_ser_results(self, endpoint_type_name: EndpointTypeName) -> SerResults {
+        SerResults {
             endpoint_type_name,
             results: self,
         }
@@ -122,12 +122,12 @@ impl Results {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct SummaryResults {
+pub(crate) struct SerResults {
     endpoint_type_name: EndpointTypeName,
     results: Results,
 }
 
-impl Serialize for SummaryResults {
+impl Serialize for SerResults {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -143,23 +143,13 @@ impl Serialize for SummaryResults {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct EndpointTypeName(pub String, pub String);
 
-impl Serialize for EndpointTypeName {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let type_name = format!("{}${}", self.0, self.1);
-        serializer.serialize_str(&type_name)
-    }
-}
-
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct SummaryAllResults {
+pub(crate) struct SerAllResults {
     aggrigated_results: Results,
-    endpoint_results: Vec<SummaryResults>,
+    endpoint_results: Vec<SerResults>,
 }
 
-#[derive(Debug, Default, Clone, Serialize)]
+#[derive(Debug, Default, Clone)]
 pub struct AllResults {
     aggrigated_results: Results,
     endpoint_results: HashMap<EndpointTypeName, Results>,
@@ -365,15 +355,15 @@ impl AllResults {
     }
 }
 
-impl Into<SummaryAllResults> for AllResults {
-    fn into(self) -> SummaryAllResults {
+impl Into<SerAllResults> for AllResults {
+    fn into(self) -> SerAllResults {
         let aggrigated_results = self.aggrigated_results;
         let endpoint_results = self
             .endpoint_results
             .into_iter()
-            .map(|(endpoint_type_name, results)| results.into_summary_results(endpoint_type_name))
+            .map(|(endpoint_type_name, results)| results.into_ser_results(endpoint_type_name))
             .collect();
-        SummaryAllResults {
+        SerAllResults {
             aggrigated_results,
             endpoint_results,
         }
