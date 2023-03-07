@@ -1,4 +1,4 @@
-use crate::{results::AllResults, test::controller::TestController};
+use crate::{results::{AllResults, SummaryAllResults}, test::controller::TestController};
 use axum::{extract::State, response::IntoResponse, routing::get, Json, Router};
 use hyper::{Error as HyperError, StatusCode};
 use std::{net::SocketAddr, sync::Arc};
@@ -50,6 +50,6 @@ async fn stop(State(server_state): State<ServerState>) -> impl IntoResponse {
 }
 
 async fn get_results(State(server_state): State<ServerState>) -> impl IntoResponse {
-    let results = server_state.all_results_arc_rwlock.read().await.clone();
-    Json(results)
+    let summary_all_results: SummaryAllResults = server_state.all_results_arc_rwlock.read().await.clone().into();
+    Json(summary_all_results)
 }

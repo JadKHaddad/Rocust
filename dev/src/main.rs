@@ -156,7 +156,7 @@ async fn main() {
     let test_config = TestConfig::new(
         20,
         1,
-        Some(5),
+        Some(30),
         2,
         true,
         true,
