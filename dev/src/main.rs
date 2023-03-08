@@ -153,24 +153,22 @@ async fn main() {
     // $Env:ROCUST_LOG="info"
     // console_subscriber::init();
 
-    let test_config = TestConfig::new(
-        20,
-        1,
-        Some(30),
-        2,
-        true,
-        true,
-        Some(tracing::level_filters::LevelFilter::INFO),
-        Some(String::from("results/log.log")),
-        Some(String::from("results/current_results.csv")),
-        Some(String::from("results/results_history.csv")),
-        Some(String::from("results/summary.yaml")),
-        Some(SocketAddr::from(([127, 0, 0, 1], 3000))),
-        // additional args, will be provided via CLI
-        vec![],
-        // stop condition: stop the test when total failures >= 200
-        // stop condition will be checked at the end of each update phase (every {update_interval} seconds})
-        Some(|stop_condition_data| {
+    let test_config = TestConfig::default()
+        .user_count(20)
+        .users_per_sec(1)
+        .runtime(20)
+        .update_interval_in_secs(2)
+        .print_to_stdout(true)
+        .log_to_stdout(true)
+        .log_level(tracing::level_filters::LevelFilter::INFO)
+        .log_file(String::from("results/log.log"))
+        .current_results_file(String::from("results/current_results.csv"))
+        .results_history_file(String::from("results/results_history.csv"))
+        .summary_file(String::from("results/summary.yaml"))
+        .server_address(SocketAddr::from(([127, 0, 0, 1], 3000)))
+        .additional_args(vec![])
+        .additional_arg(String::from("test"))
+        .stop_condition(|stop_condition_data| {
             if stop_condition_data
                 .get_all_results()
                 .get_aggrigated_results()
@@ -180,8 +178,7 @@ async fn main() {
                 return true;
             }
             false
-        }),
-    );
+        });
 
     // or get test config from CLI. stop_condition will be ignored for now (will be implemented later)
     // cargo run -p dev -- --user-count 20 --users-per-sec 4 --runtime 60 --update-interval-in-secs 3 --log-level "debug" --log-file "results/log.log" --current-results-file "results/current_results.csv" --results-history-file "results/results_history.csv" --summary-file "results/summary.json" --server-address "127.0.0.1:8080" --additional-arg "arg1" --additional-arg "arg2"

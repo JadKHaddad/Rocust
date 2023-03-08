@@ -30,41 +30,133 @@ pub struct TestConfig {
     pub stop_condition: Option<fn(StopConditionData) -> bool>,
 }
 
-impl TestConfig {
-    pub fn new(
-        user_count: u64,
-        users_per_sec: u64,
-        runtime: Option<u64>,
-        update_interval_in_secs: u64,
-        print_to_stdout: bool,
-        log_to_stdout: bool,
-        log_level: Option<LevelFilter>,
-        log_file: Option<String>,
-        current_results_file: Option<String>,
-        results_history_file: Option<String>,
-        summary_file: Option<String>,
-        server_address: Option<SocketAddr>,
-        additional_args: Vec<String>,
-        stop_condition: Option<fn(StopConditionData) -> bool>,
-    ) -> Self {
+impl Default for TestConfig {
+    fn default() -> Self {
         Self {
-            user_count,
+            user_count: 1,
+            users_per_sec: 1,
+            runtime: None,
+            update_interval_in_secs: 1,
+            print_to_stdout: true,
+            log_to_stdout: true,
+            log_level: None,
+            log_file: None,
+            current_results_file: None,
+            results_history_file: None,
+            summary_file: None,
+            server_address: None,
+            additional_args: Vec::new(),
+            stop_condition: None,
+        }
+    }
+}
+
+//Builder pattern
+impl TestConfig {
+    pub fn user_count(self, user_count: u64) -> Self {
+        Self { user_count, ..self }
+    }
+
+    pub fn users_per_sec(self, users_per_sec: u64) -> Self {
+        Self {
             users_per_sec,
-            runtime,
-            update_interval_in_secs,
-            print_to_stdout,
-            log_to_stdout,
-            log_level,
-            log_file,
-            current_results_file,
-            results_history_file,
-            summary_file,
-            server_address,
-            additional_args,
-            stop_condition,
+            ..self
         }
     }
 
+    pub fn runtime(self, runtime: u64) -> Self {
+        let runtime = Some(runtime);
+        Self { runtime, ..self }
+    }
+
+    pub fn update_interval_in_secs(self, update_interval_in_secs: u64) -> Self {
+        Self {
+            update_interval_in_secs,
+            ..self
+        }
+    }
+
+    pub fn print_to_stdout(self, print_to_stdout: bool) -> Self {
+        Self {
+            print_to_stdout,
+            ..self
+        }
+    }
+
+    pub fn log_to_stdout(self, log_to_stdout: bool) -> Self {
+        Self {
+            log_to_stdout,
+            ..self
+        }
+    }
+
+    pub fn log_level(self, log_level: LevelFilter) -> Self {
+        let log_level = Some(log_level);
+        Self { log_level, ..self }
+    }
+
+    pub fn log_file(self, log_file: String) -> Self {
+        let log_file = Some(log_file);
+        Self { log_file, ..self }
+    }
+
+    pub fn current_results_file(self, current_results_file: String) -> Self {
+        let current_results_file = Some(current_results_file);
+        Self {
+            current_results_file,
+            ..self
+        }
+    }
+
+    pub fn results_history_file(self, results_history_file: String) -> Self {
+        let results_history_file = Some(results_history_file);
+        Self {
+            results_history_file,
+            ..self
+        }
+    }
+
+    pub fn summary_file(self, summary_file: String) -> Self {
+        let summary_file = Some(summary_file);
+        Self {
+            summary_file,
+            ..self
+        }
+    }
+
+    pub fn server_address(self, server_address: SocketAddr) -> Self {
+        let server_address = Some(server_address);
+        Self {
+            server_address,
+            ..self
+        }
+    }
+
+    pub fn additional_args(self, additional_args: Vec<String>) -> Self {
+        Self {
+            additional_args,
+            ..self
+        }
+    }
+
+    pub fn additional_arg(self, additional_arg: String) -> Self {
+        let mut additional_args = self.additional_args;
+        additional_args.push(additional_arg);
+        Self {
+            additional_args,
+            ..self
+        }
+    }
+
+    pub fn stop_condition(self, stop_condition: fn(StopConditionData) -> bool) -> Self {
+        let stop_condition = Some(stop_condition);
+        Self {
+            stop_condition,
+            ..self
+        }
+    }
+}
+impl TestConfig {
     pub fn from_cli_args() -> Result<Self, FromExternalTestConfigError> {
         let external_test_config = ExternalTestConfig::parse();
         TestConfig::try_from(external_test_config)
