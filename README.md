@@ -26,7 +26,7 @@ cargo run -p dev
 - [ ] Web interface
 - [ ] Master/workers architecture (prio.)
 - [ ] Other Features
-- [ ] Prometheus metrics
+- [ ] Prometheus metrics (prio.)
 
 ## Rust version 
 1.67.1
