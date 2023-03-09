@@ -380,6 +380,7 @@ impl AllResults {
         &self.endpoint_results
     }
 }
+
 impl From<AllResults> for SerAllResults {
     fn from(all_results: AllResults) -> SerAllResults {
         let aggrigated_results = all_results.aggrigated_results;
