@@ -18,17 +18,17 @@ impl Writer {
         Ok(Writer { path })
     }
 
-    pub async fn from_str(path: &str) -> Result<Self, CreateError> {
+    pub(crate) async fn from_str(path: &str) -> Result<Self, CreateError> {
         Self::new(PathBuf::from(path)).await
     }
 
-    pub async fn write_all(&self, data: &[u8]) -> Result<(), WriteError> {
+    pub(crate) async fn write_all(&self, data: &[u8]) -> Result<(), WriteError> {
         let mut file = File::create(&self.path).await?;
         file.write_all(data).await?;
         Ok(())
     }
 
-    pub async fn append_all(&self, data: &[u8]) -> Result<(), WriteError> {
+    pub(crate) async fn append_all(&self, data: &[u8]) -> Result<(), WriteError> {
         let mut file = OpenOptions::new()
             .write(true)
             .append(true)
@@ -38,7 +38,7 @@ impl Writer {
         Ok(())
     }
 
-    pub fn get_path(&self) -> &PathBuf {
+    pub(crate) fn get_path(&self) -> &PathBuf {
         &self.path
     }
 }

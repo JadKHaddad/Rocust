@@ -246,7 +246,7 @@ impl AllResults {
         Ok(data)
     }
 
-    pub fn current_aggrigated_results_with_timestamp_csv_string(
+    pub(crate) fn current_aggrigated_results_with_timestamp_csv_string(
         &self,
         timestamp: &str,
     ) -> Result<String, CSVError> {

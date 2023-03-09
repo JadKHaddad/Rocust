@@ -15,7 +15,7 @@ pub struct EventsHandler {
 }
 
 impl EventsHandler {
-    pub fn new(user_info: EventsUserInfo, sender: UnboundedSender<MainMessage>) -> Self {
+    pub(crate) fn new(user_info: EventsUserInfo, sender: UnboundedSender<MainMessage>) -> Self {
         Self { user_info, sender }
     }
 

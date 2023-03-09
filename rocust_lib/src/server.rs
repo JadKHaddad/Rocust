@@ -20,7 +20,7 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(
+    pub(crate) fn new(
         test_controller: TestController,
         all_results_arc_rwlock: Arc<RwLock<AllResults>>,
         addr: SocketAddr,

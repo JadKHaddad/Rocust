@@ -5,7 +5,7 @@ use tokio::{
     io::{AsyncReadExt, Error as TokioIoError},
 };
 
-pub struct Reader {
+pub(crate) struct Reader {
     path: PathBuf,
 }
 
@@ -17,18 +17,18 @@ impl Reader {
         Ok(Reader { path })
     }
 
-    pub async fn from_str(path: &str) -> Result<Self, CreateError> {
+    pub(crate) async fn from_str(path: &str) -> Result<Self, CreateError> {
         Self::new(PathBuf::from(path)).await
     }
 
-    pub async fn _read_all(&self) -> Result<Vec<u8>, ReadError> {
+    pub(crate) async fn _read_all(&self) -> Result<Vec<u8>, ReadError> {
         let mut file = File::open(&self.path).await?;
         let mut data = Vec::new();
         file.read_to_end(&mut data).await?;
         Ok(data)
     }
 
-    pub async fn read_all_to_string(&self) -> Result<String, ReadError> {
+    pub(crate) async fn read_all_to_string(&self) -> Result<String, ReadError> {
         let mut file = File::open(&self.path).await?;
         let mut data = String::new();
         file.read_to_string(&mut data).await?;

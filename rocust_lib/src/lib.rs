@@ -7,7 +7,6 @@ pub(crate) mod server;
 pub mod tasks;
 pub mod test;
 pub mod traits;
-pub(crate) mod user;
 pub(crate) mod utils;
 
 pub use test::{config::TestConfig, user::context::Context, Test};
