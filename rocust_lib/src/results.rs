@@ -1,6 +1,5 @@
 use csv::{Error as CsvError, IntoInnerError as CsvIntoInnerError, Writer as CsvWriter};
 use prettytable::{row, Cell, Row, Table};
-use prometheus_client::encoding::EncodeLabelSet;
 use serde::{ser::SerializeStruct, Serialize};
 use std::{collections::HashMap, string::FromUtf8Error, time::Duration};
 use thiserror::Error as ThisError;
@@ -157,7 +156,7 @@ impl Serialize for SerResults {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, EncodeLabelSet)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct EndpointTypeName {
     pub r#type: String,
     pub name: String,

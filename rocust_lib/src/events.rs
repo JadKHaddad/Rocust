@@ -26,7 +26,7 @@ impl EventsHandler {
     pub fn add_success(&self, r#type: String, name: String, response_time: f64) {
         self.send(MainMessage::ResultMessage(ResultMessage::Success(
             SuccessResultMessage {
-                user_id: self.user_info.id,
+                user_info: self.user_info.clone(),
                 endpoint_type_name: EndpointTypeName { r#type, name },
                 response_time,
             },
@@ -36,7 +36,7 @@ impl EventsHandler {
     pub fn add_failure(&self, r#type: String, name: String) {
         self.send(MainMessage::ResultMessage(ResultMessage::Failure(
             FailureResultMessage {
-                user_id: self.user_info.id,
+                user_info: self.user_info.clone(),
                 endpoint_type_name: EndpointTypeName { r#type, name },
             },
         )));
@@ -45,7 +45,7 @@ impl EventsHandler {
     pub fn add_error(&self, r#type: String, name: String, error: String) {
         self.send(MainMessage::ResultMessage(ResultMessage::Error(
             ErrorResultMessage {
-                user_id: self.user_info.id,
+                user_info: self.user_info.clone(),
                 endpoint_type_name: EndpointTypeName { r#type, name },
                 error,
             },

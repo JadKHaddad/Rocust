@@ -7,7 +7,7 @@ use crate::{
     fs::writer::Writer,
     logging::setup_logging,
     messages::{MainMessage, ResultMessage},
-    prometheus_exporter::PrometheusExporter,
+    prometheus_exporter::{Label, PrometheusExporter},
     results::AllResults,
     server::Server,
     test::config::SupportedExtension,
@@ -468,29 +468,38 @@ impl Test {
                                 sucess_result_msg.response_time,
                             );
 
-                            self.prometheus_exporter_arc.add_success(
+                            // updating user results
+                            self.user_stats_collection.add_success(
+                                &sucess_result_msg.user_info.id,
                                 &sucess_result_msg.endpoint_type_name,
                                 sucess_result_msg.response_time,
                             );
 
-                            // updating user results
-                            self.user_stats_collection.add_success(
-                                &sucess_result_msg.user_id,
-                                &sucess_result_msg.endpoint_type_name,
+                            self.prometheus_exporter_arc.add_success(
+                                Label {
+                                    endpoint_type: sucess_result_msg.endpoint_type_name.r#type,
+                                    endpoint_name: sucess_result_msg.endpoint_type_name.name,
+                                    user_id: sucess_result_msg.user_info.id,
+                                    user_name: sucess_result_msg.user_info.name,
+                                },
                                 sucess_result_msg.response_time,
                             );
                         }
                         ResultMessage::Failure(failure_result_msg) => {
                             all_results_gaurd.add_failure(&failure_result_msg.endpoint_type_name);
 
-                            self.prometheus_exporter_arc
-                                .add_failure(&failure_result_msg.endpoint_type_name);
-
                             // updating user results
                             self.user_stats_collection.add_failure(
-                                &failure_result_msg.user_id,
+                                &failure_result_msg.user_info.id,
                                 &failure_result_msg.endpoint_type_name,
                             );
+
+                            self.prometheus_exporter_arc.add_failure(Label {
+                                endpoint_type: failure_result_msg.endpoint_type_name.r#type,
+                                endpoint_name: failure_result_msg.endpoint_type_name.name,
+                                user_id: failure_result_msg.user_info.id,
+                                user_name: failure_result_msg.user_info.name,
+                            });
                         }
                         ResultMessage::Error(error_result_msg) => {
                             all_results_gaurd.add_error(
@@ -498,15 +507,19 @@ impl Test {
                                 &error_result_msg.error,
                             );
 
-                            self.prometheus_exporter_arc
-                                .add_error(&error_result_msg.endpoint_type_name);
-
                             // updating user results
                             self.user_stats_collection.add_error(
-                                &error_result_msg.user_id,
+                                &error_result_msg.user_info.id,
                                 &error_result_msg.endpoint_type_name,
                                 &error_result_msg.error,
                             );
+
+                            self.prometheus_exporter_arc.add_error(Label {
+                                endpoint_type: error_result_msg.endpoint_type_name.r#type,
+                                endpoint_name: error_result_msg.endpoint_type_name.name,
+                                user_id: error_result_msg.user_info.id,
+                                user_name: error_result_msg.user_info.name,
+                            });
                         }
                     }
                 }
