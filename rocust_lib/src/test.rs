@@ -30,7 +30,7 @@ use self::{
     user::{context::Context, EventsUserInfo, UserController, UserStatsCollection, UserStatus},
 };
 
-type SpawnUsersHandlesVector =  Vec<JoinHandle<Vec<(JoinHandle<()>, u64)>>>;
+type SpawnUsersHandlesVector = Vec<JoinHandle<Vec<(JoinHandle<()>, u64)>>>;
 pub struct Test {
     test_config: TestConfig,
     token: Arc<CancellationToken>,

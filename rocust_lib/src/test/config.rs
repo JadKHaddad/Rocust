@@ -187,7 +187,7 @@ impl TestConfig {
 
     pub async fn from_file(file_path: &str) -> Self {
         //TODO: get file extension and call the corresponding function
-        //TODO: if file extension is not supported, try to parse it as json, yaml or toml or return an error
+        //TODO: if file extension is not supported, try to parse it as json, yaml or return an error
         todo!()
     }
 
@@ -362,14 +362,6 @@ pub enum FromYamlFileError {
     #[error("Error while parsing yaml file: {0}")]
     FromYaml(#[from] FromYamlError),
     #[error("Error while reading yaml file: {0}")]
-    ReadError(#[from] ReadError),
-    #[error("Error while creating reader: {0}")]
-    CreateError(#[from] CreateError),
-}
-
-#[derive(Debug, ThisError)]
-pub enum FromTomlFileError {
-    #[error("Error while reading toml file: {0}")]
     ReadError(#[from] ReadError),
     #[error("Error while creating reader: {0}")]
     CreateError(#[from] CreateError),
