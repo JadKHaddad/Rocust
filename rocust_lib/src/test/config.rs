@@ -156,6 +156,7 @@ impl TestConfig {
         }
     }
 }
+
 impl TestConfig {
     pub fn from_cli_args() -> Result<Self, FromExternalTestConfigError> {
         let external_test_config = ExternalTestConfig::parse();

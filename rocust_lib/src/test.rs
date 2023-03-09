@@ -30,6 +30,7 @@ use self::{
     user::{context::Context, EventsUserInfo, UserController, UserStatsCollection, UserStatus},
 };
 
+type SpawnUsersHandlesVector =  Vec<JoinHandle<Vec<(JoinHandle<()>, u64)>>>;
 pub struct Test {
     test_config: TestConfig,
     token: Arc<CancellationToken>,
@@ -487,7 +488,7 @@ impl Test {
     pub async fn after_spawn_users(
         &mut self,
         results_rx: mpsc::UnboundedReceiver<MainMessage>,
-        spawn_users_handles_vec: Vec<JoinHandle<Vec<(JoinHandle<()>, u64)>>>,
+        spawn_users_handles_vec: SpawnUsersHandlesVector,
         total_spawnable_user_count: u64,
     ) {
         // spin up a server

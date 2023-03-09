@@ -58,7 +58,6 @@ macro_rules! run {
             )*
 
             // drop because why not >:D
-            drop(shared);
             drop(test_controller);
 
             // drop the events_handler to drop the sender

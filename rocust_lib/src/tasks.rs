@@ -1,20 +1,20 @@
 use crate::{test::user::context::Context, traits::Prioritised};
 use std::{future::Future, pin::Pin};
 
+type AsyncTaskFunctionSig<T> =
+    for<'a> fn(&'a mut T, &'a Context) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>>;
+
 #[derive(Clone)]
 pub struct AsyncTask<T>
 where
     T: 'static,
 {
     priority: u64,
-    func: for<'a> fn(&'a mut T, &'a Context) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>>,
+    func: AsyncTaskFunctionSig<T>,
 }
 
 impl<T> AsyncTask<T> {
-    pub fn new(
-        priority: u64,
-        func: for<'a> fn(&'a mut T, &'a Context) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>>,
-    ) -> Self {
+    pub fn new(priority: u64, func: AsyncTaskFunctionSig<T>) -> Self {
         AsyncTask { priority, func }
     }
 
