@@ -7,6 +7,7 @@ use crate::{
     fs::writer::Writer,
     logging::setup_logging,
     messages::{MainMessage, ResultMessage},
+    prometheus_exporter::PrometheusExporter,
     results::AllResults,
     server::Server,
     test::config::SupportedExtension,
@@ -43,6 +44,7 @@ pub struct Test {
     start_timestamp_arc_rwlock: Arc<RwLock<Instant>>,
     // on test drop, the worker guard will be dropped, which will stop the logging thread
     async_log_writer_worker_guard: Option<WorkerGuard>,
+    prometheus_exporter_arc: Arc<PrometheusExporter>,
 }
 
 impl Test {
@@ -117,6 +119,7 @@ impl Test {
             user_stats_collection: UserStatsCollection::new(),
             start_timestamp_arc_rwlock: Arc::new(RwLock::new(Instant::now())),
             async_log_writer_worker_guard: None,
+            prometheus_exporter_arc: Arc::new(PrometheusExporter::new()),
         }
     }
 
@@ -292,12 +295,18 @@ impl Test {
     fn strat_server(&self) -> JoinHandle<()> {
         let test_controller = self.create_test_controller();
         let all_results_arc_rwlock = self.all_results_arc_rwlock.clone();
+        let prometheus_exporter_arc = self.prometheus_exporter_arc.clone();
         let addr = self.test_config.server_address;
         match addr {
             Some(addr) => {
                 tracing::info!("Server listening on [{}]", addr);
                 tokio::spawn(async move {
-                    let server = Server::new(test_controller, all_results_arc_rwlock, addr);
+                    let server = Server::new(
+                        test_controller,
+                        all_results_arc_rwlock,
+                        prometheus_exporter_arc,
+                        addr,
+                    );
                     // no tokio::select! here because axum is running with graceful shutdown
                     let res = server.run().await;
                     if let Err(e) = res {
@@ -421,6 +430,12 @@ impl Test {
                                 &sucess_result_msg.endpoint_type_name,
                                 sucess_result_msg.response_time,
                             );
+
+                            self.prometheus_exporter_arc.add_success(
+                                &sucess_result_msg.endpoint_type_name,
+                                sucess_result_msg.response_time,
+                            );
+
                             // updating user results
                             self.user_stats_collection.add_success(
                                 &sucess_result_msg.user_id,
@@ -430,6 +445,9 @@ impl Test {
                         }
                         ResultMessage::Failure(failure_result_msg) => {
                             all_results_gaurd.add_failure(&failure_result_msg.endpoint_type_name);
+
+                            self.prometheus_exporter_arc
+                                .add_failure(&failure_result_msg.endpoint_type_name);
 
                             // updating user results
                             self.user_stats_collection.add_failure(
@@ -442,6 +460,9 @@ impl Test {
                                 &error_result_msg.endpoint_type_name,
                                 &error_result_msg.error,
                             );
+
+                            self.prometheus_exporter_arc
+                                .add_error(&error_result_msg.endpoint_type_name);
 
                             // updating user results
                             self.user_stats_collection.add_error(

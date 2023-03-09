@@ -2,6 +2,7 @@ pub mod events;
 pub(crate) mod fs;
 pub(crate) mod logging;
 pub(crate) mod messages;
+pub(crate) mod prometheus_exporter;
 pub mod results;
 pub(crate) mod server;
 pub mod tasks;

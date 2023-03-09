@@ -27,7 +27,7 @@ impl EventsHandler {
         self.send(MainMessage::ResultMessage(ResultMessage::Success(
             SuccessResultMessage {
                 user_id: self.user_info.id,
-                endpoint_type_name: EndpointTypeName(r#type, name),
+                endpoint_type_name: EndpointTypeName { r#type, name },
                 response_time,
             },
         )));
@@ -37,7 +37,7 @@ impl EventsHandler {
         self.send(MainMessage::ResultMessage(ResultMessage::Failure(
             FailureResultMessage {
                 user_id: self.user_info.id,
-                endpoint_type_name: EndpointTypeName(r#type, name),
+                endpoint_type_name: EndpointTypeName { r#type, name },
             },
         )));
     }
@@ -46,7 +46,7 @@ impl EventsHandler {
         self.send(MainMessage::ResultMessage(ResultMessage::Error(
             ErrorResultMessage {
                 user_id: self.user_info.id,
-                endpoint_type_name: EndpointTypeName(r#type, name),
+                endpoint_type_name: EndpointTypeName { r#type, name },
                 error,
             },
         )));

@@ -1,5 +1,6 @@
 use csv::{Error as CsvError, IntoInnerError as CsvIntoInnerError, Writer as CsvWriter};
 use prettytable::{row, Cell, Row, Table};
+use prometheus_client::encoding::EncodeLabelSet;
 use serde::{ser::SerializeStruct, Serialize};
 use std::{collections::HashMap, string::FromUtf8Error, time::Duration};
 use thiserror::Error as ThisError;
@@ -149,15 +150,18 @@ impl Serialize for SerResults {
         S: serde::Serializer,
     {
         let mut state = serializer.serialize_struct("SerResults", 3)?;
-        state.serialize_field("type", &self.endpoint_type_name.0)?;
-        state.serialize_field("name", &self.endpoint_type_name.1)?;
+        state.serialize_field("type", &self.endpoint_type_name.r#type)?;
+        state.serialize_field("name", &self.endpoint_type_name.name)?;
         state.serialize_field("results", &self.results)?;
         state.end()
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
-pub struct EndpointTypeName(pub String, pub String);
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, EncodeLabelSet)]
+pub struct EndpointTypeName {
+    pub r#type: String,
+    pub name: String,
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct SerAllResults {
@@ -278,8 +282,8 @@ impl AllResults {
         wtr.write_record(FILE_HEADERS)?;
         for (endpoint_type_name, results) in &self.endpoint_results {
             wtr.write_record([
-                &endpoint_type_name.0,
-                &endpoint_type_name.1,
+                &endpoint_type_name.r#type,
+                &endpoint_type_name.name,
                 &results.total_requests.to_string(),
                 &results.total_failed_requests.to_string(),
                 &results.total_errors.to_string(),
@@ -318,8 +322,8 @@ impl AllResults {
         ));
         for (endpoint_type_name, results) in &self.endpoint_results {
             table.add_row(row![
-                endpoint_type_name.0,
-                endpoint_type_name.1,
+                endpoint_type_name.r#type,
+                endpoint_type_name.name,
                 results.total_requests,
                 results.total_failed_requests,
                 results.total_errors,
@@ -350,7 +354,7 @@ impl AllResults {
     pub fn get_by_type(&self, r#type: &str) -> Vec<&Results> {
         let mut results = Vec::new();
         for (endpoint_type_name, result) in &self.endpoint_results {
-            if endpoint_type_name.0 == r#type {
+            if endpoint_type_name.r#type == r#type {
                 results.push(result);
             }
         }
@@ -360,7 +364,7 @@ impl AllResults {
     pub fn get_by_name(&self, name: &str) -> Vec<&Results> {
         let mut results = Vec::new();
         for (endpoint_type_name, result) in &self.endpoint_results {
-            if endpoint_type_name.1 == name {
+            if endpoint_type_name.name == name {
                 results.push(result);
             }
         }
@@ -368,8 +372,10 @@ impl AllResults {
     }
 
     pub fn get_by_type_and_name(&self, r#type: &str, name: &str) -> Option<&Results> {
-        self.endpoint_results
-            .get(&EndpointTypeName(r#type.to_string(), name.to_string()))
+        self.endpoint_results.get(&EndpointTypeName {
+            r#type: r#type.to_string(),
+            name: name.to_string(),
+        })
     }
 
     pub fn get_aggrigated_results(&self) -> &Results {

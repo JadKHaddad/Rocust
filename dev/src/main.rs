@@ -156,7 +156,7 @@ async fn main() {
     let test_config = TestConfig::default()
         .user_count(20)
         .users_per_sec(1)
-        .runtime(20)
+        .runtime(30)
         .update_interval_in_secs(2)
         .print_to_stdout(true)
         .log_to_stdout(true)
