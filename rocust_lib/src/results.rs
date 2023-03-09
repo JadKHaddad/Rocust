@@ -167,6 +167,12 @@ pub enum CSVError {
     IntoInnerError(Box<CsvIntoInnerError<CsvWriter<Vec<u8>>>>), // a very big type
 }
 
+impl From<CsvIntoInnerError<CsvWriter<Vec<u8>>>> for CSVError {
+    fn from(err: CsvIntoInnerError<CsvWriter<Vec<u8>>>) -> Self {
+        CSVError::IntoInnerError(Box::new(err))
+    }
+}
+
 // TODO: refactor repeated code
 impl AllResults {
     pub(crate) fn add_success(
@@ -220,10 +226,7 @@ impl AllResults {
         let mut wtr = CsvWriter::from_writer(vec![]);
         let headers_with_timestamp = [&["TIMESTAMP"], &HEADERS[..]].concat();
         wtr.write_record(&headers_with_timestamp)?;
-        let data = String::from_utf8(
-            wtr.into_inner()
-                .map_err(|err| CSVError::IntoInnerError(Box::new(err)))?,
-        )?;
+        let data = String::from_utf8(wtr.into_inner()?)?;
         Ok(data)
     }
 
@@ -250,10 +253,7 @@ impl AllResults {
             &self.aggrigated_results.median_response_time.to_string(),
             &self.aggrigated_results.max_response_time.to_string(),
         ])?;
-        let data = String::from_utf8(
-            wtr.into_inner()
-                .map_err(|err| CSVError::IntoInnerError(Box::new(err)))?,
-        )?;
+        let data = String::from_utf8(wtr.into_inner()?)?;
         Ok(data)
     }
 
@@ -291,10 +291,7 @@ impl AllResults {
             &self.aggrigated_results.min_response_time.to_string(),
             &self.aggrigated_results.max_response_time.to_string(),
         ])?;
-        let data = String::from_utf8(
-            wtr.into_inner()
-                .map_err(|err| CSVError::IntoInnerError(Box::new(err)))?,
-        )?;
+        let data = String::from_utf8(wtr.into_inner()?)?;
         Ok(data)
     }
 
