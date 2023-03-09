@@ -4,7 +4,7 @@ use serde::{ser::SerializeStruct, Serialize};
 use std::{collections::HashMap, string::FromUtf8Error, time::Duration};
 use thiserror::Error as ThisError;
 
-const HEADERS: [&str; 11] = [
+const CONSOLE_HEADERS: [&str; 11] = [
     "TYPE",
     "NAME",
     "TOTAL REQ",
@@ -18,7 +18,23 @@ const HEADERS: [&str; 11] = [
     "MAX RES TIME",
 ];
 
-const AGR_TYPE_NAME: [&str; 2] = ["", "AGR"];
+const CONSOLE_AGR_TYPE_NAME: [&str; 2] = ["", "AGR"];
+
+const FILE_HEADERS: [&str; 11] = [
+    "type",
+    "name",
+    "total_requests",
+    "total_failed_requests",
+    "total_errors",
+    "requests_per_second",
+    "failed_requests_per_second",
+    "total_response_time",
+    "average_response_time",
+    "min_response_time",
+    "max_response_time",
+];
+
+const FILE_AGR_TYPE_NAME: [&str; 2] = ["", "aggregated"];
 
 #[derive(Debug, Default, Clone, Serialize)]
 pub struct Results {
@@ -132,7 +148,7 @@ impl Serialize for SerResults {
     where
         S: serde::Serializer,
     {
-        let mut state = serializer.serialize_struct("SummaryResults", 3)?;
+        let mut state = serializer.serialize_struct("SerResults", 3)?;
         state.serialize_field("type", &self.endpoint_type_name.0)?;
         state.serialize_field("name", &self.endpoint_type_name.1)?;
         state.serialize_field("results", &self.results)?;
@@ -224,7 +240,7 @@ impl AllResults {
 
     pub(crate) fn history_header_csv_string() -> Result<String, CSVError> {
         let mut wtr = CsvWriter::from_writer(vec![]);
-        let headers_with_timestamp = [&["TIMESTAMP"], &HEADERS[..]].concat();
+        let headers_with_timestamp = [&["timestamp"], &FILE_HEADERS[..]].concat();
         wtr.write_record(&headers_with_timestamp)?;
         let data = String::from_utf8(wtr.into_inner()?)?;
         Ok(data)
@@ -237,8 +253,8 @@ impl AllResults {
         let mut wtr = CsvWriter::from_writer(vec![]);
         wtr.write_record([
             timestamp,
-            AGR_TYPE_NAME[0],
-            AGR_TYPE_NAME[1],
+            FILE_AGR_TYPE_NAME[0],
+            FILE_AGR_TYPE_NAME[1],
             &self.aggrigated_results.total_requests.to_string(),
             &self.aggrigated_results.total_failed_requests.to_string(),
             &self.aggrigated_results.total_errors.to_string(),
@@ -259,7 +275,7 @@ impl AllResults {
 
     pub(crate) fn current_results_csv_string(&self) -> Result<String, CSVError> {
         let mut wtr = CsvWriter::from_writer(vec![]);
-        wtr.write_record(HEADERS)?;
+        wtr.write_record(FILE_HEADERS)?;
         for (endpoint_type_name, results) in &self.endpoint_results {
             wtr.write_record([
                 &endpoint_type_name.0,
@@ -276,8 +292,8 @@ impl AllResults {
             ])?;
         }
         wtr.write_record([
-            AGR_TYPE_NAME[0],
-            AGR_TYPE_NAME[1],
+            FILE_AGR_TYPE_NAME[0],
+            FILE_AGR_TYPE_NAME[1],
             &self.aggrigated_results.total_requests.to_string(),
             &self.aggrigated_results.total_failed_requests.to_string(),
             &self.aggrigated_results.total_errors.to_string(),
@@ -297,7 +313,9 @@ impl AllResults {
 
     pub(crate) fn table_string(&self) -> String {
         let mut table = Table::new();
-        table.add_row(Row::new(HEADERS.iter().map(|s| Cell::new(s)).collect()));
+        table.add_row(Row::new(
+            CONSOLE_HEADERS.iter().map(|s| Cell::new(s)).collect(),
+        ));
         for (endpoint_type_name, results) in &self.endpoint_results {
             table.add_row(row![
                 endpoint_type_name.0,
@@ -314,8 +332,8 @@ impl AllResults {
             ]);
         }
         table.add_row(row![
-            AGR_TYPE_NAME[0],
-            AGR_TYPE_NAME[1],
+            CONSOLE_AGR_TYPE_NAME[0],
+            CONSOLE_AGR_TYPE_NAME[1],
             self.aggrigated_results.total_requests,
             self.aggrigated_results.total_failed_requests,
             self.aggrigated_results.total_errors,
