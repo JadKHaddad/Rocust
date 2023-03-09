@@ -11,7 +11,7 @@ pub(crate) struct Writer {
 }
 
 impl Writer {
-    async fn new(path: PathBuf) -> Result<Self, CreateError> {
+    pub(crate) async fn new(path: PathBuf) -> Result<Self, CreateError> {
         if let Some(parent) = path.parent() {
             create_dir_all(parent).await?;
         }

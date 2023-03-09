@@ -25,7 +25,6 @@ pub struct TestConfig {
     pub results_history_file: Option<String>,
     pub summary_file: Option<String>,
     pub prometheus_current_metrics_file: Option<String>,
-    // TODO
     pub prometheus_metrics_history_folder: Option<String>,
     pub server_address: Option<SocketAddr>,
     pub additional_args: Vec<String>,
@@ -340,7 +339,7 @@ struct ExternalTestConfig {
     #[arg(long, default_value = None)]
     prometheus_current_metrics_file: Option<String>,
 
-    /// Path to the folder where the prometheus metrics history should be written to. If not set, the metrics will not be written. Prometheus metrics will be (every {update_interval} seconds) written to a file with the name {timestamp}.prom. Use with caution, this can lead to a lot of files.
+    /// Path to the folder where the prometheus metrics history should be written to. If not set, the metrics will not be written. Prometheus metrics will be (every {update_interval} seconds) written to a file with the name {timestamp}_metrics.prom. Use with caution, this can lead to a lot of files.
     #[arg(long, default_value = None)]
     prometheus_metrics_history_folder: Option<String>,
 

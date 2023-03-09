@@ -166,6 +166,7 @@ async fn main() {
         .results_history_file(String::from("results/results_history.csv"))
         .summary_file(String::from("results/summary.yaml"))
         .prometheus_current_metrics_file(String::from("results/current_metrics.prom"))
+        .prometheus_metrics_history_folder(String::from("results/metrics_history"))
         .server_address(SocketAddr::from(([127, 0, 0, 1], 3000)))
         .additional_args(vec![])
         .additional_arg(String::from("test"))
