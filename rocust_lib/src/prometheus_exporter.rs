@@ -20,26 +20,26 @@ impl PrometheusExporter {
         let mut registry = Registry::default();
         let request_counter = Family::<EndpointTypeName, Counter<u64>>::default();
         registry.register(
-            "rocust_request_total",
-            "Total number of requests.",
+            "rocust_request",
+            "Total number of requests",
             request_counter.clone(),
         );
         let failure_counter = Family::<EndpointTypeName, Counter<u64>>::default();
         registry.register(
-            "rocust_failure_total",
-            "Total number of failures.",
+            "rocust_failure",
+            "Total number of failures",
             failure_counter.clone(),
         );
         let error_counter = Family::<EndpointTypeName, Counter<u64>>::default();
         registry.register(
-            "rocust_error_total",
-            "Total number of errors.",
+            "rocust_error",
+            "Total number of errors",
             error_counter.clone(),
         );
         let response_time_gauge = Family::<EndpointTypeName, Gauge<f64, AtomicU64>>::default();
         registry.register(
             "rocust_response_time",
-            "Response time.",
+            "Response time",
             response_time_gauge.clone(),
         );
         Self {
