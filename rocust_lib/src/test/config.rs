@@ -24,6 +24,9 @@ pub struct TestConfig {
     pub current_results_file: Option<String>,
     pub results_history_file: Option<String>,
     pub summary_file: Option<String>,
+    pub prometheus_current_metrics_file: Option<String>,
+    // TODO
+    pub prometheus_metrics_history_folder: Option<String>,
     pub server_address: Option<SocketAddr>,
     pub additional_args: Vec<String>,
     // a stop condiction will be checked at the end of every update interval and will stop the test if it returns true
@@ -44,6 +47,8 @@ impl Default for TestConfig {
             current_results_file: None,
             results_history_file: None,
             summary_file: None,
+            prometheus_current_metrics_file: None,
+            prometheus_metrics_history_folder: None,
             server_address: None,
             additional_args: Vec::new(),
             stop_condition: None,
@@ -120,6 +125,25 @@ impl TestConfig {
         let summary_file = Some(summary_file);
         Self {
             summary_file,
+            ..self
+        }
+    }
+
+    pub fn prometheus_current_metrics_file(self, prometheus_current_metrics_file: String) -> Self {
+        let prometheus_current_metrics_file = Some(prometheus_current_metrics_file);
+        Self {
+            prometheus_current_metrics_file,
+            ..self
+        }
+    }
+
+    pub fn prometheus_metrics_history_folder(
+        self,
+        prometheus_metrics_history_folder: String,
+    ) -> Self {
+        let prometheus_metrics_history_folder = Some(prometheus_metrics_history_folder);
+        Self {
+            prometheus_metrics_history_folder,
             ..self
         }
     }
@@ -227,6 +251,9 @@ impl TryFrom<ExternalTestConfig> for TestConfig {
             current_results_file: external_test_config.current_results_file,
             results_history_file: external_test_config.results_history_file,
             summary_file: external_test_config.summary_file,
+            prometheus_current_metrics_file: external_test_config.prometheus_current_metrics_file,
+            prometheus_metrics_history_folder: external_test_config
+                .prometheus_metrics_history_folder,
             server_address,
             additional_args: external_test_config.additional_arg,
             stop_condition: None,
@@ -308,6 +335,14 @@ struct ExternalTestConfig {
     /// Path to the file where the summary should be written to. If not set, the summary will not be written to a file. Extension .json or .yaml/.yml
     #[arg(long, default_value = None)]
     summary_file: Option<String>,
+
+    /// Path to the file where the current prometheus metrics should be written to. If not set, the metrics will not be written to a file.
+    #[arg(long, default_value = None)]
+    prometheus_current_metrics_file: Option<String>,
+
+    /// Path to the folder where the prometheus metrics history should be written to. If not set, the metrics will not be written. Prometheus metrics will be (every {update_interval} seconds) written to a file with the name {timestamp}.prom. Use with caution, this can lead to a lot of files.
+    #[arg(long, default_value = None)]
+    prometheus_metrics_history_folder: Option<String>,
 
     /// Address for the server to listen on. If not set, the server will not be started.
     #[arg(long, default_value = None)]

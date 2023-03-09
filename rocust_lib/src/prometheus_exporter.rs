@@ -6,6 +6,7 @@ use prometheus_client::{
 };
 use std::{fmt::Error as FmtError, sync::atomic::AtomicU64};
 
+//TODO: add user id as a label
 pub(crate) struct PrometheusExporter {
     registry: Registry,
     request_counter: Family<EndpointTypeName, Counter<u64>>,

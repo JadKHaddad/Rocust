@@ -38,6 +38,7 @@ pub struct Test {
     current_results_writer: Option<Writer>,
     results_history_writer: Option<Writer>,
     summary_writer: Option<Writer>,
+    prometheus_current_metrics_writer: Option<Writer>,
     total_users_spawned_arc_rwlock: Arc<RwLock<u64>>,
     all_results_arc_rwlock: Arc<RwLock<AllResults>>,
     user_stats_collection: UserStatsCollection,
@@ -108,12 +109,29 @@ impl Test {
         } else {
             None
         };
+        let prometheus_current_metrics_writer = if let Some(prometheus_current_metrics_file) =
+            &test_config.prometheus_current_metrics_file
+        {
+            match Writer::from_str(prometheus_current_metrics_file).await {
+                Ok(writer) => Some(writer),
+                Err(e) => {
+                    tracing::error!(
+                        "Failed to create writer for prometheus current metrics file: [{}]",
+                        e
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
         Test {
             test_config,
             token: Arc::new(CancellationToken::new()),
             current_results_writer,
             results_history_writer,
             summary_writer,
+            prometheus_current_metrics_writer,
             total_users_spawned_arc_rwlock: Arc::new(RwLock::new(0)),
             all_results_arc_rwlock: Arc::new(RwLock::new(AllResults::default())),
             user_stats_collection: UserStatsCollection::new(),
@@ -326,10 +344,12 @@ impl Test {
         let token = self.token.clone();
         let total_users_spawned_arc_rwlock = self.total_users_spawned_arc_rwlock.clone();
         let all_results_arc_rwlock = self.all_results_arc_rwlock.clone();
+        let prometheus_exporter_arc = self.prometheus_exporter_arc.clone();
         let start_timestamp_arc_rwlock = self.start_timestamp_arc_rwlock.clone();
         let test_config = self.test_config.clone();
         let current_results_writer = self.current_results_writer.clone();
         let results_history_writer = self.results_history_writer.clone();
+        let prometheus_current_metrics_writer = self.prometheus_current_metrics_writer.clone();
         tokio::spawn(async move {
             let mut print_total_spawned_users = true;
             loop {
@@ -400,6 +420,23 @@ impl Test {
                                 }
                                 Err(e) => {
                                     tracing::error!("Error getting timestamp: {}", e);
+                                }
+                            }
+                        }
+
+                        if let Some(writer) = &prometheus_current_metrics_writer {
+                            let prometheus_metrics_string = prometheus_exporter_arc.get_metrics();
+                            match prometheus_metrics_string {
+                                Ok(prometheus_metrics_string) => {
+                                    match writer.write_all(prometheus_metrics_string.as_bytes()).await {
+                                        Ok(_) => {}
+                                        Err(e) => {
+                                            tracing::error!("Error writing to prometheus: {}", e);
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::error!("Error getting prometheus string: {}", e);
                                 }
                             }
                         }
