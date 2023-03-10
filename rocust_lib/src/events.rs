@@ -4,6 +4,7 @@ use crate::{
         TaskExecutedMessage, UserSelfStoppedMessage, UserSpawnedMessage,
     },
     results::EndpointTypeName,
+    tasks::EventsTaskInfo,
     test::user::EventsUserInfo,
 };
 use tokio::sync::mpsc::UnboundedSender;
@@ -58,15 +59,16 @@ impl EventsHandler {
         }));
     }
 
-    pub(crate) fn add_task_executed(&self) {
+    pub(crate) fn add_task_executed(&self, task_info: EventsTaskInfo) {
         self.send(MainMessage::TaskExecuted(TaskExecutedMessage {
-            user_id: self.user_info.id,
+            user_info: self.user_info.clone(),
+            task_info,
         }));
     }
 
     pub(crate) fn add_user_self_stopped(&self) {
         self.send(MainMessage::UserSelfStopped(UserSelfStoppedMessage {
-            user_id: self.user_info.id,
+            user_info: self.user_info.clone(),
         }));
     }
 

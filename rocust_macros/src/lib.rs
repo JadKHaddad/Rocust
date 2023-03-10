@@ -130,7 +130,9 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
                     u.#method_name(context).await;
                 })
             }
-            async_tasks.push(rocust::rocust_lib::tasks::AsyncTask::new(#priority, #method_name));
+            // create string from the method name
+            let method_name_str = String::from(stringify!(#method_name));
+            async_tasks.push(rocust::rocust_lib::tasks::AsyncTask::new(#priority, method_name_str, #method_name));
         }
     });
 

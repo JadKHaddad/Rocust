@@ -7,9 +7,10 @@ use crate::{
     fs::{timestamped_writer::TimeStapmedWriter, writer::Writer},
     logging::setup_logging,
     messages::{MainMessage, ResultMessage},
-    prometheus_exporter::{RequestLebel, PrometheusExporter},
+    prometheus_exporter::{PrometheusExporter, RequestLabel, TaskLabel, UserLabel},
     results::AllResults,
     server::Server,
+    tasks::EventsTaskInfo,
     test::config::SupportedExtension,
     traits::{HasTask, PrioritisedRandom, Shared, User},
     utils::{get_extension_from_filename, get_timestamp_as_millis_as_string},
@@ -33,6 +34,7 @@ use self::{
 
 type SpawnUsersHandlesVector = Vec<JoinHandle<Vec<(JoinHandle<()>, u64)>>>;
 pub struct Test {
+    // TODO: No track of current users count!
     test_config: TestConfig,
     token: Arc<CancellationToken>,
     current_results_writer: Option<Writer>,
@@ -267,7 +269,11 @@ impl Test {
 
                                 // this is the actual task
                                 task.call(&mut user, &user_context).await;
-                                user_context.get_events_handler().add_task_executed();
+                                user_context.get_events_handler().add_task_executed(
+                                    EventsTaskInfo {
+                                        name: task.name.clone(),
+                                    },
+                                );
                             };
 
                             tokio::select! {
@@ -517,7 +523,7 @@ impl Test {
                             );
 
                             self.prometheus_exporter_arc.add_success(
-                                RequestLebel {
+                                RequestLabel {
                                     endpoint_type: sucess_result_msg.endpoint_type_name.r#type,
                                     endpoint_name: sucess_result_msg.endpoint_type_name.name,
                                     user_id: sucess_result_msg.user_info.id,
@@ -535,7 +541,7 @@ impl Test {
                                 &failure_result_msg.endpoint_type_name,
                             );
 
-                            self.prometheus_exporter_arc.add_failure(RequestLebel {
+                            self.prometheus_exporter_arc.add_failure(RequestLabel {
                                 endpoint_type: failure_result_msg.endpoint_type_name.r#type,
                                 endpoint_name: failure_result_msg.endpoint_type_name.name,
                                 user_id: failure_result_msg.user_info.id,
@@ -555,7 +561,7 @@ impl Test {
                                 &error_result_msg.error,
                             );
 
-                            self.prometheus_exporter_arc.add_error(RequestLebel {
+                            self.prometheus_exporter_arc.add_error(RequestLabel {
                                 endpoint_type: error_result_msg.endpoint_type_name.r#type,
                                 endpoint_name: error_result_msg.endpoint_type_name.name,
                                 user_id: error_result_msg.user_info.id,
@@ -564,6 +570,7 @@ impl Test {
                         }
                     }
                 }
+
                 MainMessage::UserSpawned(user_spawned_msg) => {
                     let mut total_users_spawned_gaurd =
                         self.total_users_spawned_arc_rwlock.write().await;
@@ -571,16 +578,35 @@ impl Test {
 
                     self.user_stats_collection.insert_user(
                         user_spawned_msg.user_info.id,
-                        user_spawned_msg.user_info.name,
+                        user_spawned_msg.user_info.name.clone(),
                     );
+
+                    self.prometheus_exporter_arc.add_user(UserLabel {
+                        user_name: user_spawned_msg.user_info.name,
+                    });
                 }
+
+                // tasks with suicide or panic are not included
                 MainMessage::TaskExecuted(user_fired_task_msg) => {
                     self.user_stats_collection
-                        .increment_total_tasks(&user_fired_task_msg.user_id);
+                        .increment_total_tasks(&user_fired_task_msg.user_info.id);
+
+                    self.prometheus_exporter_arc.add_task(TaskLabel {
+                        user_id: user_fired_task_msg.user_info.id,
+                        user_name: user_fired_task_msg.user_info.name,
+                        task_name: user_fired_task_msg.task_info.name,
+                    });
                 }
+
                 MainMessage::UserSelfStopped(user_self_stopped_msg) => {
-                    self.user_stats_collection
-                        .set_user_status(&user_self_stopped_msg.user_id, UserStatus::Cancelled);
+                    self.user_stats_collection.set_user_status(
+                        &user_self_stopped_msg.user_info.id,
+                        UserStatus::Cancelled,
+                    );
+
+                    self.prometheus_exporter_arc.remove_user(UserLabel {
+                        user_name: user_self_stopped_msg.user_info.name,
+                    });
                 }
             }
         }

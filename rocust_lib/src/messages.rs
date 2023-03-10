@@ -1,4 +1,4 @@
-use crate::{results::EndpointTypeName, test::user::EventsUserInfo};
+use crate::{results::EndpointTypeName, tasks::EventsTaskInfo, test::user::EventsUserInfo};
 
 pub enum MainMessage {
     ResultMessage(ResultMessage),
@@ -8,11 +8,12 @@ pub enum MainMessage {
 }
 
 pub struct UserSelfStoppedMessage {
-    pub(crate) user_id: u64,
+    pub(crate) user_info: EventsUserInfo,
 }
 
 pub struct TaskExecutedMessage {
-    pub(crate) user_id: u64,
+    pub(crate) user_info: EventsUserInfo,
+    pub(crate) task_info: EventsTaskInfo,
 }
 
 pub struct UserSpawnedMessage {

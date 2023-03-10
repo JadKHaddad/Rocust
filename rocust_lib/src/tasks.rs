@@ -9,13 +9,18 @@ pub struct AsyncTask<T>
 where
     T: 'static,
 {
-    priority: u64,
-    func: AsyncTaskFunctionSig<T>,
+    pub(crate) priority: u64,
+    pub(crate) name: String,
+    pub(crate) func: AsyncTaskFunctionSig<T>,
 }
 
 impl<T> AsyncTask<T> {
-    pub fn new(priority: u64, func: AsyncTaskFunctionSig<T>) -> Self {
-        AsyncTask { priority, func }
+    pub fn new(priority: u64, name: String, func: AsyncTaskFunctionSig<T>) -> Self {
+        AsyncTask {
+            priority,
+            name,
+            func,
+        }
     }
 
     pub fn get_priority(&self) -> u64 {
@@ -25,6 +30,10 @@ impl<T> AsyncTask<T> {
     pub async fn call(&self, user: &mut T, context: &Context) {
         (self.func)(user, context).await;
     }
+}
+
+pub(crate) struct EventsTaskInfo {
+    pub(crate) name: String,
 }
 
 impl<T> Prioritised for AsyncTask<T> {

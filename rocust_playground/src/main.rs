@@ -27,7 +27,11 @@ impl<'a, 'b> HasTask for MyUser<'static, 'static> {
                 u.suicide(context).await;
             })
         }
-        async_tasks.push(rocust::rocust_lib::tasks::AsyncTask::new(1, func));
+        async_tasks.push(rocust::rocust_lib::tasks::AsyncTask::new(
+            1,
+            String::from("name"),
+            func,
+        ));
         async_tasks
     }
 }
