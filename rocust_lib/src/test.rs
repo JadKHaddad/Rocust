@@ -7,7 +7,7 @@ use crate::{
     fs::{timestamped_writer::TimeStapmedWriter, writer::Writer},
     logging::setup_logging,
     messages::{MainMessage, ResultMessage},
-    prometheus_exporter::{Label, PrometheusExporter},
+    prometheus_exporter::{RequestLebel, PrometheusExporter},
     results::AllResults,
     server::Server,
     test::config::SupportedExtension,
@@ -517,7 +517,7 @@ impl Test {
                             );
 
                             self.prometheus_exporter_arc.add_success(
-                                Label {
+                                RequestLebel {
                                     endpoint_type: sucess_result_msg.endpoint_type_name.r#type,
                                     endpoint_name: sucess_result_msg.endpoint_type_name.name,
                                     user_id: sucess_result_msg.user_info.id,
@@ -535,7 +535,7 @@ impl Test {
                                 &failure_result_msg.endpoint_type_name,
                             );
 
-                            self.prometheus_exporter_arc.add_failure(Label {
+                            self.prometheus_exporter_arc.add_failure(RequestLebel {
                                 endpoint_type: failure_result_msg.endpoint_type_name.r#type,
                                 endpoint_name: failure_result_msg.endpoint_type_name.name,
                                 user_id: failure_result_msg.user_info.id,
@@ -555,7 +555,7 @@ impl Test {
                                 &error_result_msg.error,
                             );
 
-                            self.prometheus_exporter_arc.add_error(Label {
+                            self.prometheus_exporter_arc.add_error(RequestLebel {
                                 endpoint_type: error_result_msg.endpoint_type_name.r#type,
                                 endpoint_name: error_result_msg.endpoint_type_name.name,
                                 user_id: error_result_msg.user_info.id,
