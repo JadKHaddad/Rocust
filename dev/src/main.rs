@@ -28,7 +28,7 @@ struct GoogleUser {
     host: &'static str,
 }
 
-#[has_task(min_sleep = 1, max_sleep = 3, weight = 5)]
+#[has_task(min_sleep = 10, max_sleep = 20, weight = 1)]
 impl GoogleUser {
     #[task(priority = 40)]
     pub async fn index(&mut self, context: &Context) {
@@ -132,7 +132,7 @@ struct FacebookUser {
     client: Client,
 }
 
-#[has_task(min_sleep = 1, max_sleep = 5, weight = 1)]
+#[has_task(min_sleep = 10, max_sleep = 20, weight = 1)]
 impl FacebookUser {
     #[task(priority = 10)]
     pub async fn index(&mut self, context: &Context) {
@@ -199,9 +199,9 @@ async fn main() {
     // console_subscriber::init();
 
     let test_config = TestConfig::default()
-        .user_count(20)
+        .user_count(100)
         .users_per_sec(1)
-        .runtime(30)
+        .runtime(6000)
         .update_interval_in_secs(2)
         .print_to_stdout(true)
         .log_to_stdout(true)
@@ -214,30 +214,31 @@ async fn main() {
         .prometheus_metrics_history_folder(String::from("results/metrics_history"))
         .server_address(SocketAddr::from(([127, 0, 0, 1], 3000)))
         .additional_args(vec![])
-        .additional_arg(String::from("test"))
-        .stop_condition(|stop_condition_data| {
-            if stop_condition_data
-                .get_all_results()
-                .get_aggrigated_results()
-                .get_total_failed_requests()
-                >= 200
-            {
-                return true;
-            }
-            false
-        });
+        .additional_arg(String::from("test"));
+
+    // .stop_condition(|stop_condition_data| {
+    //     if stop_condition_data
+    //         .get_all_results()
+    //         .get_aggrigated_results()
+    //         .get_total_failed_requests()
+    //         >= 200
+    //     {
+    //         return true;
+    //     }
+    //     false
+    // });
 
     // or get test config from CLI. stop_condition will be ignored for now (will be implemented later)
     // cargo run -p dev -- --user-count 20 --users-per-sec 4 --runtime 60 --update-interval-in-secs 3 --log-level "debug" --log-file "results/log.log" --current-results-file "results/current_results.csv" --results-history-file "results/results_history.csv" --summary-file "results/summary.json" --server-address "127.0.0.1:8080" --additional-arg "arg1" --additional-arg "arg2"
     //let test_config = TestConfig::from_cli_args().expect("Failed to get test config from CLI args");
 
     let mut test = Test::new(test_config).await;
-    let test_controller = test.create_test_controller();
+    //let test_controller = test.create_test_controller();
 
-    tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(100)).await;
-        test_controller.stop();
-    });
+    // tokio::spawn(async move {
+    //     tokio::time::sleep(std::time::Duration::from_secs(100)).await;
+    //     test_controller.stop();
+    // });
 
     run!(test, GoogleUser, FacebookUser).await;
 
