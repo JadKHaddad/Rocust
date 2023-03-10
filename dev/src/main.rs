@@ -22,32 +22,37 @@ impl Shared for MyShared {
     }
 }
 
-struct MyUser {
+struct GoogleUser {
     id: u64,
     client: Client,
+    host: &'static str,
 }
 
-#[has_task(min_sleep = 1, max_sleep = 2, weight = 5)]
-impl MyUser {
+#[has_task(min_sleep = 1, max_sleep = 3, weight = 5)]
+impl GoogleUser {
     #[task(priority = 40)]
     pub async fn index(&mut self, context: &Context) {
         let start = std::time::Instant::now();
-        let res = self.client.get("https://google.com").send().await;
+        let res = self
+            .client
+            .get(format!("https://{}", self.host))
+            .send()
+            .await;
         let end = std::time::Instant::now();
         match res {
             Ok(res) => {
                 if res.status().is_success() {
                     let duration = end.duration_since(start);
                     let duration = duration.as_secs_f64();
-                    context.add_success(String::from("GET"), String::from("/"), duration);
+                    context.add_success(String::from("GET"), format!("{}/", self.host), duration);
                 } else {
-                    context.add_failure(String::from("GET"), String::from("/"));
+                    context.add_failure(String::from("GET"), format!("{}/", self.host));
                 }
             }
             Err(_) => {
                 context.add_error(
                     String::from("GET"),
-                    String::from("/"),
+                    format!("{}/", self.host),
                     String::from("error"),
                 );
             }
@@ -59,7 +64,7 @@ impl MyUser {
         let start = std::time::Instant::now();
         let res = self
             .client
-            .get("https://google.com/none_existing_path")
+            .get(format!("https://{}/none_existing_path", self.host))
             .send()
             .await;
         let end = std::time::Instant::now();
@@ -70,17 +75,20 @@ impl MyUser {
                     let duration = duration.as_secs_f64();
                     context.add_success(
                         String::from("GET"),
-                        String::from("/none_existing_path"),
+                        format!("{}/none_existing_path", self.host),
                         duration,
                     );
                 } else {
-                    context.add_failure(String::from("GET"), String::from("/none_existing_path"));
+                    context.add_failure(
+                        String::from("GET"),
+                        format!("{}/none_existing_path", self.host),
+                    );
                 }
             }
             Err(_) => {
                 context.add_error(
                     String::from("GET"),
-                    String::from("/none_existing_path"),
+                    format!("{}/none_existing_path", self.host),
                     String::from("error"),
                 );
             }
@@ -99,30 +107,66 @@ impl MyUser {
 }
 
 #[async_trait]
-impl User for MyUser {
+impl User for GoogleUser {
     type Shared = ();
 
     async fn new(_test_config: &TestConfig, context: &Context, _shared: Self::Shared) -> Self {
         let client = Client::new();
-        MyUser {
+        GoogleUser {
             id: context.get_id(),
             client,
+            host: "google.com",
         }
     }
 
     async fn on_start(&mut self, _: &Context) {
-        println!("MyUser {} started", self.id);
+        println!("GoogleUser {} started", self.id);
     }
 
     async fn on_stop(&mut self, _: &Context) {
-        println!("MyUser {} stopped", self.id);
+        println!("GoogleUser {} stopped", self.id);
     }
 }
 
-struct MyUser2 {}
+struct FacebookUser {
+    client: Client,
+}
 
-#[has_task(min_sleep = 1, max_sleep = 1, weight = 1)]
-impl MyUser2 {
+#[has_task(min_sleep = 1, max_sleep = 5, weight = 1)]
+impl FacebookUser {
+    #[task(priority = 10)]
+    pub async fn index(&mut self, context: &Context) {
+        let start = std::time::Instant::now();
+        let res = self
+            .client
+            .get(format!("https://facebook.com"))
+            .send()
+            .await;
+        let end = std::time::Instant::now();
+        match res {
+            Ok(res) => {
+                if res.status().is_success() {
+                    let duration = end.duration_since(start);
+                    let duration = duration.as_secs_f64();
+                    context.add_success(
+                        String::from("GET"),
+                        String::from("facebook.com/"),
+                        duration,
+                    );
+                } else {
+                    context.add_failure(String::from("GET"), String::from("facebook.com/"));
+                }
+            }
+            Err(_) => {
+                context.add_error(
+                    String::from("GET"),
+                    String::from("facebook.com/"),
+                    String::from("error"),
+                );
+            }
+        }
+    }
+
     #[task(priority = 1)]
     async fn suicide(&mut self, context: &Context) {
         context.stop();
@@ -130,18 +174,19 @@ impl MyUser2 {
 }
 
 #[async_trait]
-impl User for MyUser2 {
+impl User for FacebookUser {
     type Shared = ();
     async fn new(_test_config: &TestConfig, _context: &Context, _shared: Self::Shared) -> Self {
-        MyUser2 {}
+        let client = Client::new();
+        FacebookUser { client }
     }
 
     async fn on_start(&mut self, context: &Context) {
-        println!("MyUser2 {} started", context.get_id());
+        println!("FacebookUser {} started", context.get_id());
     }
 
     async fn on_stop(&mut self, context: &Context) {
-        println!("MyUser2 {} stopped", context.get_id());
+        println!("FacebookUser {} stopped", context.get_id());
     }
 }
 
@@ -194,7 +239,7 @@ async fn main() {
         test_controller.stop();
     });
 
-    run!(test, MyUser, MyUser2).await;
+    run!(test, GoogleUser, FacebookUser).await;
 
     //tokio::time::sleep(std::time::Duration::from_secs(60)).await;
 }

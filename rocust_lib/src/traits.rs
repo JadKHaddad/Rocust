@@ -1,12 +1,9 @@
-use crate::{test::config::TestConfig, test::user::context::Context};
+use crate::{tasks::AsyncTask, test::config::TestConfig, test::user::context::Context};
 use async_trait::async_trait;
 use rand::{distributions::WeightedIndex, prelude::Distribution};
 
-pub trait HasTask: 'static {
-    fn get_async_tasks() -> Vec<crate::tasks::AsyncTask<Self>>
-    where
-        Self: Sized,
-    {
+pub trait HasTask: Sized + 'static {
+    fn get_async_tasks() -> Vec<AsyncTask<Self>> {
         vec![]
     }
 
@@ -27,9 +24,9 @@ pub trait HasTask: 'static {
 pub trait User: Send + Sized + 'static {
     type Shared: Shared;
 
-    async fn new(_test_config: &TestConfig, _data: &Context, _shared: Self::Shared) -> Self;
-    async fn on_start(&mut self, _data: &Context) {}
-    async fn on_stop(&mut self, _data: &Context) {}
+    async fn new(_test_config: &TestConfig, _context: &Context, _shared: Self::Shared) -> Self;
+    async fn on_start(&mut self, _context: &Context) {}
+    async fn on_stop(&mut self, _context: &Context) {}
 }
 
 #[async_trait]
