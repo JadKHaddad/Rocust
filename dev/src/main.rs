@@ -139,7 +139,7 @@ impl FacebookUser {
         let start = std::time::Instant::now();
         let res = self
             .client
-            .get(format!("https://facebook.com"))
+            .get(String::from("https://facebook.com"))
             .send()
             .await;
         let end = std::time::Instant::now();

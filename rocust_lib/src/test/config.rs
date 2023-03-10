@@ -208,7 +208,7 @@ impl TestConfig {
         Ok(TestConfig::from_yaml_string(&yaml_string)?)
     }
 
-    pub async fn from_file(file_path: &str) -> Self {
+    pub async fn from_file(_file_path: &str) -> Self {
         //TODO: get file extension and call the corresponding function
         //TODO: if file extension is not supported, try to parse it as json, yaml or return an error
         todo!()

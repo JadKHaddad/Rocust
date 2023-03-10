@@ -8,12 +8,14 @@ struct MyUser<'a, 'b> {
     street: &'b str,
 }
 
+#[allow(clippy::all)]
 impl<'a, 'b> MyUser<'a, 'b> {
     async fn suicide(&mut self, context: &Context) {
         context.stop();
     }
 }
 
+#[allow(clippy::all)]
 impl<'a, 'b> HasTask for MyUser<'static, 'static> {
     fn get_async_tasks() -> Vec<rocust::rocust_lib::tasks::AsyncTask<Self>> {
         let mut async_tasks = vec![];
@@ -36,6 +38,7 @@ impl<'a, 'b> HasTask for MyUser<'static, 'static> {
     }
 }
 
+#[allow(clippy::all)]
 #[async_trait]
 impl<'a, 'b> User for MyUser<'static, 'static> {
     type Shared = ();
