@@ -63,11 +63,15 @@ impl PrometheusExporter {
             response_time_gauge.clone(),
         );
         let task_counter = Family::<TaskLabel, Counter<u64>>::default();
-        registry.register("rocust_task", "Total number of tasks", task_counter.clone());
+        registry.register(
+            "rocust_task",
+            "Total number of tasks, tasks with suicide or panic are not included",
+            task_counter.clone(),
+        );
         let user_count_gauge = Family::<UserLabel, Gauge>::default();
         registry.register(
             "rocust_user_count",
-            "Number of users",
+            "Total Number of users, users that have paincked are not tracked",
             user_count_gauge.clone(),
         );
         Self {
