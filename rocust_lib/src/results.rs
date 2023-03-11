@@ -49,6 +49,7 @@ pub struct Results {
     requests_per_second: f64,
     failed_requests_per_second: f64,
 }
+// TODO: avg is total response time / total requests (total requests includes failed requests)
 
 impl Results {
     fn add_success(&mut self, response_time: f64) {

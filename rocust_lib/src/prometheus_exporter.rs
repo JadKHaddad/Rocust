@@ -40,19 +40,19 @@ impl PrometheusExporter {
         let mut registry = Registry::default();
         let request_counter = Family::<RequestLabel, Counter<u64>>::default();
         registry.register(
-            "rocust_request",
+            "rocust_requests",
             "Total number of requests",
             request_counter.clone(),
         );
         let failure_counter = Family::<RequestLabel, Counter<u64>>::default();
         registry.register(
-            "rocust_failure",
+            "rocust_failures",
             "Total number of failures",
             failure_counter.clone(),
         );
         let error_counter = Family::<RequestLabel, Counter<u64>>::default();
         registry.register(
-            "rocust_error",
+            "rocust_errors",
             "Total number of errors",
             error_counter.clone(),
         );
@@ -64,7 +64,7 @@ impl PrometheusExporter {
         );
         let task_counter = Family::<TaskLabel, Counter<u64>>::default();
         registry.register(
-            "rocust_task",
+            "rocust_tasks",
             "Total number of tasks, tasks with suicide or panic are not included",
             task_counter.clone(),
         );
