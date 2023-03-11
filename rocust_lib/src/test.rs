@@ -402,7 +402,7 @@ impl Test {
 
                         // update stats
                         let elapsed_time = Test::calculate_elapsed_time(&*start_timestamp_arc_rwlock.read().await);
-                        all_results_gaurd.calculate_per_second(&elapsed_time);
+                        all_results_gaurd.calculate_on_update_interval(&elapsed_time);
 
                         // print stats
                         if test_config.print_to_stdout {
@@ -697,7 +697,7 @@ impl Test {
             let elapsed_time =
                 Test::calculate_elapsed_time(&*self.start_timestamp_arc_rwlock.read().await);
             self.user_stats_collection
-                .calculate_per_second(&elapsed_time);
+                .calculate_on_update_interval(&elapsed_time);
 
             let extension = SupportedExtension::from_str(
                 get_extension_from_filename(summary_writer.get_path()).unwrap_or(""),

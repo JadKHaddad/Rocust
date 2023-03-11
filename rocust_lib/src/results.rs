@@ -49,13 +49,11 @@ pub struct Results {
     requests_per_second: f64,
     failed_requests_per_second: f64,
 }
-// TODO: avg is total response time / total requests (total requests includes failed requests)
 
 impl Results {
     fn add_success(&mut self, response_time: f64) {
         self.total_response_time += response_time;
         self.total_requests += 1;
-        self.average_response_time = self.total_response_time / self.total_requests as f64;
         if self.min_response_time == 0.0 || response_time < self.min_response_time {
             self.min_response_time = response_time;
         }
@@ -73,6 +71,11 @@ impl Results {
         self.total_errors += 1;
     }
 
+    fn calculate_average_response_time(&mut self) {
+        // (total_requests - total_failed_requests) = total_successful_requests
+        self.average_response_time =
+            self.total_response_time / (self.total_requests - self.total_failed_requests) as f64;
+    }
     fn calculate_requests_per_second(&mut self, elapsed: &Duration) {
         let total_requests = self.total_requests;
         let requests_per_second = total_requests as f64 / elapsed.as_secs_f64();
@@ -85,7 +88,8 @@ impl Results {
         self.failed_requests_per_second = failed_requests_per_second;
     }
 
-    fn calculate_per_second(&mut self, elapsed: &Duration) {
+    fn calculate_on_update_interval(&mut self, elapsed: &Duration) {
+        self.calculate_average_response_time();
         self.calculate_requests_per_second(elapsed);
         self.calculate_failed_requests_per_second(elapsed);
     }
@@ -235,10 +239,11 @@ impl AllResults {
         }
     }
 
-    pub(crate) fn calculate_per_second(&mut self, elapsed: &Duration) {
-        self.aggrigated_results.calculate_per_second(elapsed);
+    pub(crate) fn calculate_on_update_interval(&mut self, elapsed: &Duration) {
+        self.aggrigated_results
+            .calculate_on_update_interval(elapsed);
         for (_, endpoint_results) in self.endpoint_results.iter_mut() {
-            endpoint_results.calculate_per_second(elapsed);
+            endpoint_results.calculate_on_update_interval(elapsed);
         }
     }
 

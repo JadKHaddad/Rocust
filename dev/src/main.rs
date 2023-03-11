@@ -5,7 +5,7 @@ use rocust::{
     rocust_macros::has_task,
 };
 use std::{net::SocketAddr, sync::Arc};
-use tokio::sync::RwLock;
+use tokio::{signal, sync::RwLock};
 
 #[allow(dead_code)]
 #[derive(Clone)]
@@ -215,7 +215,6 @@ async fn main() {
         .server_address(SocketAddr::from(([127, 0, 0, 1], 3000)))
         .additional_args(vec![])
         .additional_arg(String::from("test"));
-
     // .stop_condition(|stop_condition_data| {
     //     if stop_condition_data
     //         .get_all_results()
@@ -233,43 +232,15 @@ async fn main() {
     // let test_config = TestConfig::from_cli_args().expect("Failed to get test config from CLI args");
 
     let mut test = Test::new(test_config).await;
-    // let test_controller = test.create_test_controller();
+    let test_controller = test.create_test_controller();
 
-    // tokio::spawn(async move {
-    //     tokio::time::sleep(std::time::Duration::from_secs(100)).await;
-    //     test_controller.stop();
-    // });
+    // stop test on ctrl+c
+    tokio::spawn(async move {
+        signal::ctrl_c().await.unwrap();
+        test_controller.stop();
+    });
 
     run!(test, GoogleUser, FacebookUser).await;
 
     // tokio::time::sleep(std::time::Duration::from_secs(60)).await;
 }
-
-// total requests sent
-// sum (rocust_requests_total)
-
-// total failures
-// sum (rocust_failures_total)
-
-// total errors
-// sum (rocust_errors_total)
-
-// total requests per user type
-// sum by (user_name) (rocust_requests_total)
-
-// total requests per user type and endpoint name
-// sum by (user_name, endpoint_name) (rocust_requests_total)
-
-// total requests per endpoint name and type
-// sum by (endpoint_name, endpoint_type) (rocust_requests_total)
-
-// maximum response time for the last 60 minutes
-// max by (max_over_time(rocust_response_time[60m]))
-
-// maximum response time for a certian user type for the last 60 minutes
-// max by (user_name) (max_over_time(rocust_response_time[60m]))
-
-// maximum response time for a certian endpoint name for the last 60 minutes
-// max by (endpoint_name) (max_over_time(rocust_response_time[60m]))
-
-// minimum is analogical to maximum

@@ -74,9 +74,9 @@ impl UserStatsCollection {
         }
     }
 
-    pub(crate) fn calculate_per_second(&mut self, elapsed: &Duration) {
+    pub(crate) fn calculate_on_update_interval(&mut self, elapsed: &Duration) {
         for user_stats in self.user_stats_map.values_mut() {
-            user_stats.all_results.calculate_per_second(elapsed);
+            user_stats.all_results.calculate_on_update_interval(elapsed);
         }
     }
 
