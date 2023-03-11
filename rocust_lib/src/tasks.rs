@@ -10,12 +10,12 @@ where
     T: 'static,
 {
     pub(crate) priority: u64,
-    pub(crate) name: String,
+    pub(crate) name: &'static str,
     pub(crate) func: AsyncTaskFunctionSig<T>,
 }
 
 impl<T> AsyncTask<T> {
-    pub fn new(priority: u64, name: String, func: AsyncTaskFunctionSig<T>) -> Self {
+    pub fn new(priority: u64, name: &'static str, func: AsyncTaskFunctionSig<T>) -> Self {
         AsyncTask {
             priority,
             name,
@@ -33,7 +33,7 @@ impl<T> AsyncTask<T> {
 }
 
 pub(crate) struct EventsTaskInfo {
-    pub(crate) name: String,
+    pub(crate) name: &'static str,
 }
 
 impl<T> Prioritised for AsyncTask<T> {

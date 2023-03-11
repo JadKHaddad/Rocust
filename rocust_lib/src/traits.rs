@@ -7,9 +7,7 @@ pub trait HasTask: Sized + 'static {
         vec![]
     }
 
-    fn get_name() -> String {
-        String::new()
-    }
+    fn get_name() -> &'static str;
 
     fn get_between() -> (u64, u64) {
         (0, 0)

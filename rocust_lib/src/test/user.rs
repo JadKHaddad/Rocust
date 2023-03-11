@@ -47,7 +47,7 @@ impl UserStatsCollection {
         }
     }
 
-    pub(crate) fn insert_user(&mut self, user_id: u64, user_name: String) {
+    pub(crate) fn insert_user(&mut self, user_id: u64, user_name: &'static str) {
         self.user_stats_map.insert(
             user_id,
             UserStats::new(
@@ -170,13 +170,13 @@ pub enum UserStatus {
 #[derive(Debug, Clone, Serialize)]
 pub struct UserStatsInfo {
     pub id: u64,
-    pub name: String,
+    pub name: &'static str,
     pub status: UserStatus,
     pub total_tasks: u64,
 }
 
 impl UserStatsInfo {
-    pub fn new(id: u64, name: String) -> Self {
+    pub fn new(id: u64, name: &'static str) -> Self {
         Self {
             id,
             name,
@@ -189,11 +189,11 @@ impl UserStatsInfo {
 #[derive(Debug, Clone)]
 pub struct EventsUserInfo {
     pub id: u64,
-    pub name: String,
+    pub name: &'static str,
 }
 
 impl EventsUserInfo {
-    pub fn new(id: u64, name: String) -> Self {
+    pub fn new(id: u64, name: &'static str) -> Self {
         Self { id, name }
     }
 }

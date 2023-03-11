@@ -578,7 +578,7 @@ impl Test {
 
                     self.user_stats_collection.insert_user(
                         user_spawned_msg.user_info.id,
-                        user_spawned_msg.user_info.name.clone(),
+                        user_spawned_msg.user_info.name,
                     );
 
                     self.prometheus_exporter_arc.add_user(UserLabel {

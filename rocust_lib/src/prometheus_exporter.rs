@@ -10,19 +10,19 @@ pub(crate) struct RequestLabel {
     pub endpoint_type: String,
     pub endpoint_name: String,
     pub user_id: u64,
-    pub user_name: String,
+    pub user_name: &'static str,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, EncodeLabelSet)]
 pub(crate) struct TaskLabel {
     pub user_id: u64,
-    pub user_name: String,
-    pub task_name: String,
+    pub user_name: &'static str,
+    pub task_name: &'static str,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, EncodeLabelSet)]
 pub(crate) struct UserLabel {
-    pub user_name: String,
+    pub user_name: &'static str,
 }
 
 pub(crate) struct PrometheusExporter {

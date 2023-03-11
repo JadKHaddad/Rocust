@@ -124,15 +124,14 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
     }
 
     let methods = methods.iter().map(|(method_name, priority)| {
+        let method_name_str = syn::LitStr::new(&method_name.to_string(), proc_macro2::Span::call_site());
         quote! {
             fn #method_name<'a>(u: &'a mut #struct_name, context: &'a rocust::rocust_lib::test::user::context::Context) -> ::core::pin::Pin<Box<dyn ::core::future::Future<Output = ()> + ::core::marker::Send + 'a>> {
                 Box::pin(async move {
                     u.#method_name(context).await;
                 })
             }
-            // create string from the method name
-            let method_name_str = String::from(stringify!(#method_name));
-            async_tasks.push(rocust::rocust_lib::tasks::AsyncTask::new(#priority, method_name_str, #method_name));
+            async_tasks.push(rocust::rocust_lib::tasks::AsyncTask::new(#priority, #method_name_str, #method_name));
         }
     });
 
@@ -147,8 +146,8 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
                 async_tasks
             }
 
-            fn get_name() -> String {
-                String::from(#name)
+            fn get_name() -> &'static str {
+                #name
             }
 
             fn get_between() -> (u64, u64) {
