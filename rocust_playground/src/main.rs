@@ -30,11 +30,13 @@ impl<'a, 'b> HasTask for MyUser<'static, 'static> {
             })
         }
         async_tasks.push(rocust::rocust_lib::tasks::AsyncTask::new(
-            1,
-            String::from("name"),
-            func,
+            1, "suicide", func,
         ));
         async_tasks
+    }
+
+    fn get_name() -> &'static str {
+        "MyUser"
     }
 }
 
