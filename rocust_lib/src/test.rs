@@ -34,14 +34,9 @@ use self::{
 
 type SpawnUsersHandlesVector = Vec<JoinHandle<Vec<(JoinHandle<()>, u64)>>>;
 pub struct Test {
-    // TODO: No track of current users count!
     test_config: TestConfig,
     token: Arc<CancellationToken>,
-    current_results_writer: Option<Writer>,
-    results_history_writer: Option<Writer>,
-    summary_writer: Option<Writer>,
-    prometheus_current_metrics_writer: Option<Writer>,
-    prometheus_metrics_history_writer: Option<TimeStapmedWriter>,
+    writers: Writers,
     total_users_spawned_arc_rwlock: Arc<RwLock<u64>>,
     all_results_arc_rwlock: Arc<RwLock<AllResults>>,
     user_stats_collection: UserStatsCollection,
@@ -51,112 +46,21 @@ pub struct Test {
     prometheus_exporter_arc: Arc<PrometheusExporter>,
 }
 
+pub struct Writers {
+    current_results_writer: Option<Writer>,
+    results_history_writer: Option<Writer>,
+    summary_writer: Option<Writer>,
+    prometheus_current_metrics_writer: Option<Writer>,
+    prometheus_metrics_history_writer: Option<TimeStapmedWriter>,
+}
+
 impl Test {
     pub async fn new(test_config: TestConfig) -> Self {
-        let current_results_writer = if let Some(current_results_file) =
-            &test_config.current_results_file
-        {
-            match Writer::from_str(current_results_file).await {
-                Ok(writer) => Some(writer),
-                Err(e) => {
-                    tracing::error!("Failed to create writer for current results file: [{}]", e);
-                    None
-                }
-            }
-        } else {
-            None
-        };
-        let results_history_writer = if let Some(results_history_file) =
-            &test_config.results_history_file
-        {
-            match Writer::from_str(results_history_file).await {
-                Ok(writer) => {
-                    // write header
-                    let header = AllResults::history_header_csv_string();
-                    match header {
-                        Ok(header) => match writer.write_all(header.as_bytes()).await {
-                            Ok(_) => Some(writer),
-                            Err(e) => {
-                                tracing::error!(
-                                    "Failed to write header to results history file: [{}]",
-                                    e
-                                );
-                                None
-                            }
-                        },
-                        Err(e) => {
-                            tracing::error!(
-                                "Failed to create header for results history file: [{}]",
-                                e
-                            );
-                            None
-                        }
-                    }
-                }
-                Err(e) => {
-                    tracing::error!("Failed to create writer for results history file: [{}]", e);
-                    None
-                }
-            }
-        } else {
-            None
-        };
-        let summary_writer = if let Some(summary_file) = &test_config.summary_file {
-            match Writer::from_str(summary_file).await {
-                Ok(writer) => Some(writer),
-                Err(e) => {
-                    tracing::error!("Failed to create writer for summary file: [{}]", e);
-                    None
-                }
-            }
-        } else {
-            None
-        };
-        let prometheus_current_metrics_writer = if let Some(prometheus_current_metrics_file) =
-            &test_config.prometheus_current_metrics_file
-        {
-            match Writer::from_str(prometheus_current_metrics_file).await {
-                Ok(writer) => Some(writer),
-                Err(e) => {
-                    tracing::error!(
-                        "Failed to create writer for prometheus current metrics file: [{}]",
-                        e
-                    );
-                    None
-                }
-            }
-        } else {
-            None
-        };
-        let prometheus_metrics_history_writer = if let Some(prometheus_metrics_history_folder) =
-            &test_config.prometheus_metrics_history_folder
-        {
-            match TimeStapmedWriter::from_str(
-                prometheus_metrics_history_folder,
-                String::from("metrics.prom"),
-            )
-            .await
-            {
-                Ok(writer) => Some(writer),
-                Err(e) => {
-                    tracing::error!(
-                        "Failed to create writer for prometheus history metrics: [{}]",
-                        e
-                    );
-                    None
-                }
-            }
-        } else {
-            None
-        };
-        Test {
+        let writers = Writers::new(&test_config).await;
+        Self {
             test_config,
             token: Arc::new(CancellationToken::new()),
-            current_results_writer,
-            results_history_writer,
-            summary_writer,
-            prometheus_current_metrics_writer,
-            prometheus_metrics_history_writer,
+            writers,
             total_users_spawned_arc_rwlock: Arc::new(RwLock::new(0)),
             all_results_arc_rwlock: Arc::new(RwLock::new(AllResults::default())),
             user_stats_collection: UserStatsCollection::new(),
@@ -376,10 +280,12 @@ impl Test {
         let prometheus_exporter_arc = self.prometheus_exporter_arc.clone();
         let start_timestamp_arc_rwlock = self.start_timestamp_arc_rwlock.clone();
         let test_config = self.test_config.clone();
-        let current_results_writer = self.current_results_writer.clone();
-        let results_history_writer = self.results_history_writer.clone();
-        let prometheus_current_metrics_writer = self.prometheus_current_metrics_writer.clone();
-        let prometheus_metrics_history_writer = self.prometheus_metrics_history_writer.clone();
+        let current_results_writer = self.writers.current_results_writer.clone();
+        let results_history_writer = self.writers.results_history_writer.clone();
+        let prometheus_current_metrics_writer =
+            self.writers.prometheus_current_metrics_writer.clone();
+        let prometheus_metrics_history_writer =
+            self.writers.prometheus_metrics_history_writer.clone();
         tokio::spawn(async move {
             let mut print_total_spawned_users = true;
             loop {
@@ -692,7 +598,7 @@ impl Test {
     }
 
     async fn write_summary_to_file(&mut self) {
-        if let Some(summary_writer) = &self.summary_writer {
+        if let Some(summary_writer) = &self.writers.summary_writer {
             tracing::info!("Writing summary to file");
             let elapsed_time =
                 Test::calculate_elapsed_time(&*self.start_timestamp_arc_rwlock.read().await);
@@ -725,5 +631,113 @@ impl Drop for Test {
     // test is not clone so this is fine to stop the test on drop
     fn drop(&mut self) {
         self.token.cancel();
+    }
+}
+
+impl Writers {
+    pub async fn new(test_config: &TestConfig) -> Self {
+        let current_results_writer = if let Some(current_results_file) =
+            &test_config.current_results_file
+        {
+            match Writer::from_str(current_results_file).await {
+                Ok(writer) => Some(writer),
+                Err(e) => {
+                    tracing::error!("Failed to create writer for current results file: [{}]", e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        let results_history_writer = if let Some(results_history_file) =
+            &test_config.results_history_file
+        {
+            match Writer::from_str(results_history_file).await {
+                Ok(writer) => {
+                    // write header
+                    let header = AllResults::history_header_csv_string();
+                    match header {
+                        Ok(header) => match writer.write_all(header.as_bytes()).await {
+                            Ok(_) => Some(writer),
+                            Err(e) => {
+                                tracing::error!(
+                                    "Failed to write header to results history file: [{}]",
+                                    e
+                                );
+                                None
+                            }
+                        },
+                        Err(e) => {
+                            tracing::error!(
+                                "Failed to create header for results history file: [{}]",
+                                e
+                            );
+                            None
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to create writer for results history file: [{}]", e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        let summary_writer = if let Some(summary_file) = &test_config.summary_file {
+            match Writer::from_str(summary_file).await {
+                Ok(writer) => Some(writer),
+                Err(e) => {
+                    tracing::error!("Failed to create writer for summary file: [{}]", e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        let prometheus_current_metrics_writer = if let Some(prometheus_current_metrics_file) =
+            &test_config.prometheus_current_metrics_file
+        {
+            match Writer::from_str(prometheus_current_metrics_file).await {
+                Ok(writer) => Some(writer),
+                Err(e) => {
+                    tracing::error!(
+                        "Failed to create writer for prometheus current metrics file: [{}]",
+                        e
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        let prometheus_metrics_history_writer = if let Some(prometheus_metrics_history_folder) =
+            &test_config.prometheus_metrics_history_folder
+        {
+            match TimeStapmedWriter::from_str(
+                prometheus_metrics_history_folder,
+                String::from("metrics.prom"),
+            )
+            .await
+            {
+                Ok(writer) => Some(writer),
+                Err(e) => {
+                    tracing::error!(
+                        "Failed to create writer for prometheus history metrics: [{}]",
+                        e
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        Self {
+            current_results_writer,
+            results_history_writer,
+            summary_writer,
+            prometheus_current_metrics_writer,
+            prometheus_metrics_history_writer,
+        }
     }
 }
