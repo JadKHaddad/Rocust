@@ -88,7 +88,7 @@ impl Test {
             tokio::time::sleep(Duration::from_secs(between.0)).await;
             return;
         }
-        let sleep_time = rand::thread_rng().gen_range(between.0..between.1);
+        let sleep_time = rand::thread_rng().gen_range(between.0..=between.1);
         tokio::time::sleep(Duration::from_secs(sleep_time)).await;
     }
 
