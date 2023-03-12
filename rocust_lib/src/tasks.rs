@@ -4,6 +4,10 @@ use std::{future::Future, pin::Pin};
 type AsyncTaskFunctionSig<T> =
     for<'a> fn(&'a mut T, &'a Context) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>>;
 
+type BlockingTaskResult<T> = Result<(T, Context), tokio::task::JoinError>;
+type BlockingTaskFunctionSig<T> =
+    fn(T, Context) -> Pin<Box<dyn Future<Output = BlockingTaskResult<T>> + Send>>;
+
 #[derive(Clone)]
 pub struct AsyncTask<T>
 where
@@ -32,6 +36,31 @@ impl<T> AsyncTask<T> {
     }
 }
 
+#[derive(Clone)]
+pub struct BlockingTask<T> {
+    pub(crate) priority: u64,
+    pub(crate) name: &'static str,
+    pub(crate) func: BlockingTaskFunctionSig<T>,
+}
+
+impl<T> BlockingTask<T> {
+    pub fn new(priority: u64, name: &'static str, func: BlockingTaskFunctionSig<T>) -> Self {
+        BlockingTask {
+            priority,
+            name,
+            func,
+        }
+    }
+
+    pub fn get_priority(&self) -> u64 {
+        self.priority
+    }
+
+    pub async fn call(&self, user: T, context: Context) -> BlockingTaskResult<T> {
+        (self.func)(user, context).await
+    }
+}
+
 pub(crate) struct EventsTaskInfo {
     pub(crate) name: &'static str,
 }
@@ -42,22 +71,8 @@ impl<T> Prioritised for AsyncTask<T> {
     }
 }
 
-#[derive(Clone)]
-pub struct Task<T> {
-    priority: i32,
-    func: fn(&mut T) -> (),
-}
-
-impl<T> Task<T> {
-    pub fn new(priority: i32, func: fn(&mut T) -> ()) -> Self {
-        Task { priority, func }
-    }
-
-    pub fn get_priority(&self) -> i32 {
+impl<T> Prioritised for BlockingTask<T> {
+    fn get_priority(&self) -> u64 {
         self.priority
-    }
-
-    pub fn call(&self, user: &mut T) {
-        (self.func)(user);
     }
 }

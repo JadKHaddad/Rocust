@@ -9,3 +9,4 @@ edition = "2021"
 rocust = {path = "../rocust"}
 tokio = {version="1.24.2", features=["full"]}
 async-trait = "0.1.64"
+reqwest = {version="0.11.14", features=["blocking"]}
