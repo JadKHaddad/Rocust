@@ -41,22 +41,6 @@ impl HasTask for MyUser {
             1, "suicide", suicide,
         ));
 
-        fn blocking(
-            u: MyUser,
-            context: rocust::rocust_lib::test::user::context::Context,
-        ) -> ::core::pin::Pin<
-            Box<
-                dyn ::core::future::Future<
-                        Output = Result<
-                            (MyUser, rocust::rocust_lib::test::user::context::Context),
-                            tokio::task::JoinError,
-                        >,
-                    > + ::core::marker::Send,
-            >,
-        > {
-            Box::pin(async move { tokio::task::spawn_blocking(move || u.blocking(context)).await })
-        }
-
         async_tasks
     }
 
@@ -76,7 +60,24 @@ impl User for MyUser {
 
 #[tokio::main]
 async fn main() {
-    let mut user = MyUser {};
-    let tasks = MyUser::get_async_tasks();
-    for task in tasks {}
+    let mut blocking_tasks = vec![];
+    fn blocking(
+        u: MyUser,
+        context: rocust::rocust_lib::test::user::context::Context,
+    ) -> ::core::pin::Pin<
+        Box<
+            dyn ::core::future::Future<
+                    Output = Result<
+                        (MyUser, rocust::rocust_lib::test::user::context::Context),
+                        tokio::task::JoinError,
+                    >,
+                > + ::core::marker::Send,
+        >,
+    > {
+        Box::pin(async move { tokio::task::spawn_blocking(move || u.blocking(context)).await })
+    }
+
+    blocking_tasks.push(rocust::rocust_lib::tasks::BlockingTask::new(
+        1, "blocking", blocking,
+    ));
 }
