@@ -3,7 +3,9 @@ use rocust::rocust_lib::{traits::HasTask, Context, TestConfig, User};
 
 #[allow(dead_code)]
 
-struct MyUser {}
+struct MyUser {
+    id: u64,
+}
 
 #[allow(clippy::all)]
 impl MyUser {
@@ -12,6 +14,7 @@ impl MyUser {
     }
 
     fn blocking(mut self, context: Context) -> (Self, Context) {
+        self.id = self.id + 1;
         let body = reqwest::blocking::get("https://www.rust-lang.org")
             .unwrap()
             .text()
@@ -54,7 +57,7 @@ impl HasTask for MyUser {
 impl User for MyUser {
     type Shared = ();
     async fn new(_test_config: &TestConfig, _context: &Context, _shared: Self::Shared) -> Self {
-        MyUser {}
+        MyUser { id: 0 }
     }
 }
 

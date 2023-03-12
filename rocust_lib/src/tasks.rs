@@ -39,15 +39,15 @@ impl<T> AsyncTask<T> {
 #[derive(Clone)]
 pub struct BlockingTask<T> {
     pub(crate) priority: u64,
-    pub(crate) name: &'static str,
+    pub(crate) _name: &'static str,
     pub(crate) func: BlockingTaskFunctionSig<T>,
 }
 
 impl<T> BlockingTask<T> {
-    pub fn new(priority: u64, name: &'static str, func: BlockingTaskFunctionSig<T>) -> Self {
+    pub fn new(priority: u64, _name: &'static str, func: BlockingTaskFunctionSig<T>) -> Self {
         BlockingTask {
             priority,
-            name,
+            _name,
             func,
         }
     }

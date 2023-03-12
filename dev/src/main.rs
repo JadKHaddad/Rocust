@@ -31,6 +31,37 @@ struct GoogleUser {
 #[has_task(min_sleep = 10, max_sleep = 20, weight = 1)]
 impl GoogleUser {
     #[task(priority = 40)]
+    pub async fn blocking_index(&mut self, context: &Context) {
+        println!("GoogleUser [{}] performing blocking", self.id);
+        let host = self.host;
+        let res = tokio::task::spawn_blocking(move || {
+            reqwest::blocking::get(format!("https://{}", host))
+        })
+        .await
+        .unwrap();
+        match res {
+            Ok(res) => {
+                if res.status().is_success() {
+                    context.add_success(
+                        String::from("BLOCKING GET"),
+                        format!("{}/", self.host),
+                        0.0,
+                    );
+                } else {
+                    context.add_failure(String::from("BLOCKING GET"), format!("{}/", self.host));
+                }
+            }
+            Err(_) => {
+                context.add_error(
+                    String::from("BLOCKING GET"),
+                    format!("{}/", self.host),
+                    String::from("error"),
+                );
+            }
+        }
+    }
+
+    #[task(priority = 40)]
     pub async fn index(&mut self, context: &Context) {
         let start = std::time::Instant::now();
         let res = self
@@ -120,11 +151,11 @@ impl User for GoogleUser {
     }
 
     async fn on_start(&mut self, _: &Context) {
-        println!("GoogleUser {} started", self.id);
+        println!("GoogleUser [{}] started", self.id);
     }
 
     async fn on_stop(&mut self, _: &Context) {
-        println!("GoogleUser {} stopped", self.id);
+        println!("GoogleUser [{}] stopped", self.id);
     }
 }
 
@@ -182,11 +213,11 @@ impl User for FacebookUser {
     }
 
     async fn on_start(&mut self, context: &Context) {
-        println!("FacebookUser {} started", context.get_id());
+        println!("FacebookUser [{}] started", context.get_id());
     }
 
     async fn on_stop(&mut self, context: &Context) {
-        println!("FacebookUser {} stopped", context.get_id());
+        println!("FacebookUser [{}] stopped", context.get_id());
     }
 }
 
