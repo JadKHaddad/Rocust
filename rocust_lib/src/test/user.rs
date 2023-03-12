@@ -198,6 +198,7 @@ impl EventsUserInfo {
     }
 }
 
+#[derive(Clone)]
 pub struct UserController {
     token: Arc<CancellationToken>,
 }

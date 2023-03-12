@@ -110,7 +110,7 @@ impl Test {
         shared: S,
     ) -> JoinHandle<Vec<(JoinHandle<()>, u64)>>
     where
-        T: HasTask + User + User<Shared = S>,
+        T: HasTask + User + User<Shared = S> + Clone,
         S: Shared,
     {
         tracing::info!(
@@ -119,8 +119,10 @@ impl Test {
             T::get_name(),
             starting_index
         );
-        let tasks = Arc::new(T::get_async_tasks());
-        if tasks.is_empty() {
+        let async_tasks = Arc::new(T::get_async_tasks());
+        let blocking_tasks = Arc::new(T::get_blocking_tasks());
+
+        if async_tasks.is_empty() && blocking_tasks.is_empty() {
             // TODO: total users spawned will always be logged since it will never reach total spawnbale users
             tracing::warn!("User [{}] has no tasks. Will not be spawned", T::get_name());
             return tokio::spawn(async move { vec![] }); // just to avoid an infinite loop
@@ -149,13 +151,14 @@ impl Test {
                 let events_handler = EventsHandler::new(user_info, results_tx.clone());
 
                 // create the data for the user
-                let user_context = Context::new(
+                let mut user_context = Context::new(
                     test_controller.clone(),
                     events_handler.clone(),
                     user_controller,
                 );
 
-                let tasks = tasks.clone();
+                let async_tasks = async_tasks.clone();
+                let blocking_tasks = blocking_tasks.clone();
                 let shared = shared.clone();
 
                 let handle = tokio::spawn(async move {
@@ -163,19 +166,20 @@ impl Test {
                     let mut user = T::new(&test_config, &user_context, shared).await;
                     user.on_start(&user_context).await;
 
+                    // async loop
                     loop {
                         // get a random task
-                        if let Some(task) = tasks.get_prioritised_random() {
+                        if let Some(async_task) = async_tasks.get_prioritised_random() {
                             // call it, do some sleep
                             let task_call_and_sleep = async {
                                 // this is the sleep time of a user
                                 Test::sleep_between(between).await;
 
                                 // this is the actual task
-                                task.call(&mut user, &user_context).await;
+                                async_task.call(&mut user, &user_context).await;
                                 user_context.get_events_handler().add_task_executed(
                                     EventsTaskInfo {
-                                        name: task.name.clone(),
+                                        name: async_task.name,
                                     },
                                 );
                             };
@@ -194,6 +198,48 @@ impl Test {
                             }
                         }
                     }
+
+                    // blocking loop
+                    let mut break_loop = false;
+                    loop {
+                        if break_loop {
+                            break;
+                        }
+
+                        let blocking_user = user.clone();
+                        let blocking_context = user_context.clone();
+
+                        (user, user_context, break_loop) = if let Some(blocking_task) =
+                            blocking_tasks.get_prioritised_random()
+                        {
+                            let task_call_and_sleep = async {
+                                // this is the sleep time of a user
+                                Test::sleep_between(between).await;
+
+                                // this is the actual task
+                                blocking_task
+                                    .call(blocking_user, blocking_context)
+                                    .await
+                                    .unwrap()
+                            };
+                            tokio::select! {
+                                _ = user_token.cancelled() => {
+                                    tracing::info!("User [{}][{}] attempted suicide", T::get_name(), id);
+                                    user_context.get_events_handler().add_user_self_stopped();
+                                    (user, user_context, true)
+                                }
+                                _ = test_token_for_user.cancelled() => {
+                                    (user, user_context, true)
+                                }
+                                res = task_call_and_sleep => {
+                                    (res.0, res.1, false)
+                                }
+                            }
+                        } else {
+                            (user, user_context, true)
+                        };
+                    }
+
                     user.on_stop(&user_context).await;
                 });
                 handles.push((handle, id));

@@ -1,9 +1,17 @@
-use crate::{tasks::AsyncTask, test::config::TestConfig, test::user::context::Context};
+use crate::{
+    tasks::{AsyncTask, BlockingTask},
+    test::config::TestConfig,
+    test::user::context::Context,
+};
 use async_trait::async_trait;
 use rand::{distributions::WeightedIndex, prelude::Distribution};
 
 pub trait HasTask: Sized + 'static {
     fn get_async_tasks() -> Vec<AsyncTask<Self>> {
+        vec![]
+    }
+
+    fn get_blocking_tasks() -> Vec<BlockingTask<Self>> {
         vec![]
     }
 

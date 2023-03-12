@@ -1,6 +1,7 @@
 use crate::{events::EventsHandler, test::controller::TestController, test::user::UserController};
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct Context {
     // each user will recieve a Data obj containing
 

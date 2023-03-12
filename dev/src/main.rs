@@ -22,6 +22,7 @@ impl Shared for MyShared {
     }
 }
 
+#[derive(Clone)]
 struct GoogleUser {
     id: u64,
     client: Client,
@@ -128,6 +129,7 @@ impl User for GoogleUser {
     }
 }
 
+#[derive(Clone)]
 struct FacebookUser {
     client: Client,
 }
