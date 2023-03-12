@@ -108,6 +108,7 @@ impl GoogleUser {
     }
 
     #[task(priority = 50)]
+    // if your task does not need to be blocking. Use the async version of the task.
     fn blocking(mut self, context: Context) -> (Self, Context) {
         tracing::info!(
             "[{}] My blocking count is: {}",
@@ -146,6 +147,15 @@ impl GoogleUser {
             context.stop();
         }
         (self, context)
+    }
+}
+
+impl Drop for GoogleUser {
+    fn drop(&mut self) {
+        // performing a blocking task will cause a user to drop and be recreated, because the user is running on a separate thread where blocking is acceptable.
+        // tokio::task::spawn_blocking(|| {});
+        // if your task does not need to be blocking. Use the async version of the task.
+        println!("GoogleUser [{}] dropped bye bye!", self.id);
     }
 }
 
