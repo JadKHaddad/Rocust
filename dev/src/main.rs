@@ -27,6 +27,7 @@ struct GoogleUser {
     id: u64,
     client: Client,
     host: &'static str,
+    blocking_count: u32,
 }
 
 #[has_task(min_sleep = 10, max_sleep = 20, weight = 1)]
@@ -105,6 +106,47 @@ impl GoogleUser {
     async fn suicide(&mut self, context: &Context) {
         context.stop();
     }
+
+    #[task(priority = 50)]
+    fn blocking(mut self, context: Context) -> (Self, Context) {
+        tracing::info!(
+            "[{}] My blocking count is: {}",
+            self.id,
+            self.blocking_count
+        );
+        let start = std::time::Instant::now();
+        let res = reqwest::blocking::get(format!("https://{}", self.host));
+        let end = std::time::Instant::now();
+        match res {
+            Ok(res) => {
+                if res.status().is_success() {
+                    let duration = end.duration_since(start);
+                    let duration = duration.as_secs_f64();
+                    context.add_success(
+                        String::from("BLOCKING GET"),
+                        format!("{}/", self.host),
+                        duration,
+                    );
+                } else {
+                    context.add_failure(String::from("BLOCKING GET"), format!("{}/", self.host));
+                }
+            }
+            Err(_) => {
+                context.add_error(
+                    String::from("BLOCKING GET"),
+                    format!("{}/", self.host),
+                    String::from("error"),
+                );
+            }
+        }
+        self.blocking_count += 1;
+
+        let should_i_stop = self.blocking_count % 5 == 0;
+        if should_i_stop {
+            context.stop();
+        }
+        (self, context)
+    }
 }
 
 #[async_trait]
@@ -117,6 +159,7 @@ impl User for GoogleUser {
             id: context.get_id(),
             client,
             host: "google.com",
+            blocking_count: 0,
         }
     }
 

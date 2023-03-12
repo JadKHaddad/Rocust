@@ -166,90 +166,90 @@ impl Test {
                     let mut user = T::new(&test_config, &user_context, shared).await;
                     user.on_start(&user_context).await;
 
-                    // async loop
-                    loop {
-                        // get a random task
-                        if let Some(async_task) = async_tasks.get_prioritised_random() {
-                            // call it, do some sleep
-                            let task_call_and_sleep = async {
-                                // this is the sleep time of a user
-                                Test::sleep_between(between).await;
-
-                                // this is the actual task
-                                async_task.call(&mut user, &user_context).await;
-                                user_context.get_events_handler().add_task_executed(
-                                    EventsTaskInfo {
-                                        name: async_task.name,
-                                    },
-                                );
-                            };
-
-                            tokio::select! {
-                                _ = user_token.cancelled() => {
-                                    tracing::info!("User [{}][{}] attempted suicide", T::get_name(), id);
-                                    user_context.get_events_handler().add_user_self_stopped();
-                                    break;
-                                }
-                                _ = test_token_for_user.cancelled() => {
-                                    break;
-                                }
-                                _ = task_call_and_sleep => {
-                                }
-                            }
-                        }
-                    }
-
-                    // blocking loop
                     let mut break_loop = false;
                     loop {
                         if break_loop {
                             break;
                         }
+                        // TODO: Experemental
+                        // decide if blocking or async
+                        let decision = rand::thread_rng().gen_range(0..=1);
+                        if decision == 0 {
+                            let blocking_user = user.clone();
+                            let blocking_context = user_context.clone();
 
-                        let blocking_user = user.clone();
-                        let blocking_context = user_context.clone();
+                            (user, user_context, break_loop) = if let Some(blocking_task) =
+                                blocking_tasks.get_prioritised_random()
+                            {
+                                let task_call_and_sleep = async {
+                                    // this is the sleep time of a user
+                                    Test::sleep_between(between).await;
 
-                        (user, user_context, break_loop) = if let Some(blocking_task) =
-                            blocking_tasks.get_prioritised_random()
-                        {
-                            let task_call_and_sleep = async {
-                                // this is the sleep time of a user
-                                Test::sleep_between(between).await;
-
-                                // this is the actual task
-                                blocking_task.call(blocking_user, blocking_context).await
-                            };
-                            tokio::select! {
-                                _ = user_token.cancelled() => {
-                                    tracing::info!("User [{}][{}] attempted suicide", T::get_name(), id);
-                                    user_context.get_events_handler().add_user_self_stopped();
-                                    (user, user_context, true)
-                                }
-                                _ = test_token_for_user.cancelled() => {
-                                    (user, user_context, true)
-                                }
-                                res = task_call_and_sleep => {
-                                    match res {
-                                        Ok(res) => {
-                                            user_context.get_events_handler().add_task_executed(
-                                                EventsTaskInfo {
-                                                    name: blocking_task.name,
-                                                },
-                                            );
-                                            (res.0, res.1, false)
-                                        },
-                                        Err(_) => {
-                                            // task call panicked
-                                            (user, user_context, true)
-                                        }
+                                    // this is the actual task
+                                    blocking_task.call(blocking_user, blocking_context).await
+                                };
+                                tokio::select! {
+                                    _ = user_token.cancelled() => {
+                                        tracing::info!("User [{}][{}] attempted suicide", T::get_name(), id);
+                                        user_context.get_events_handler().add_user_self_stopped();
+                                        (user, user_context, true)
                                     }
+                                    _ = test_token_for_user.cancelled() => {
+                                        (user, user_context, true)
+                                    }
+                                    res = task_call_and_sleep => {
+                                        match res {
+                                            Ok(res) => {
+                                                user_context.get_events_handler().add_task_executed(
+                                                    EventsTaskInfo {
+                                                        name: blocking_task.name,
+                                                    },
+                                                );
+                                                (res.0, res.1, false)
+                                            },
+                                            Err(_) => {
+                                                // task call panicked
+                                                (user, user_context, true)
+                                            }
+                                        }
 
+                                    }
+                                }
+                            } else {
+                                // unreachable!
+                                (user, user_context, false)
+                            };
+                        } else {
+                            // get a random task
+                            if let Some(async_task) = async_tasks.get_prioritised_random() {
+                                // call it, do some sleep
+                                let task_call_and_sleep = async {
+                                    // this is the sleep time of a user
+                                    Test::sleep_between(between).await;
+
+                                    // this is the actual task
+                                    async_task.call(&mut user, &user_context).await;
+                                    user_context.get_events_handler().add_task_executed(
+                                        EventsTaskInfo {
+                                            name: async_task.name,
+                                        },
+                                    );
+                                };
+
+                                tokio::select! {
+                                    _ = user_token.cancelled() => {
+                                        tracing::info!("User [{}][{}] attempted suicide", T::get_name(), id);
+                                        user_context.get_events_handler().add_user_self_stopped();
+                                        break;
+                                    }
+                                    _ = test_token_for_user.cancelled() => {
+                                        break;
+                                    }
+                                    _ = task_call_and_sleep => {
+                                    }
                                 }
                             }
-                        } else {
-                            // unreachable!
-                            (user, user_context, true)
-                        };
+                        }
                     }
 
                     user.on_stop(&user_context).await;

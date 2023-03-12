@@ -103,11 +103,12 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
 
                     if let TokenTree::Literal(lit) = iter.next().expect("No literal found") {
                         if let Ok(priority) = lit.to_string().parse::<u64>() {
-                            if method.sig.asyncness.is_none() {
-                                panic!("Only async methods are supported");
-                            }
                             let priority = syn::LitInt::new(&priority.to_string(), lit.span());
-                            methods.push((method.sig.ident.clone(), priority));
+                            methods.push((
+                                method.sig.ident.clone(),
+                                priority,
+                                method.sig.asyncness.is_some(),
+                            ));
                         } else {
                             panic!("Only u64 is supported");
                         }
@@ -123,7 +124,19 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
         }
     }
 
-    let methods = methods.iter().map(|(method_name, priority)| {
+    let blocking_methods = methods.iter().filter(|(_, _, is_async)| !is_async).map(|(method_name, priority, _)| {
+        let method_name_str = syn::LitStr::new(&method_name.to_string(), proc_macro2::Span::call_site());
+        quote! {
+            fn #method_name(u: #struct_name, context: rocust::rocust_lib::test::user::context::Context) -> ::core::pin::Pin<Box<dyn ::core::future::Future<Output = Result<(#struct_name, rocust::rocust_lib::test::user::context::Context),tokio::task::JoinError>> + ::core::marker::Send>> {
+                Box::pin(async move {
+                    tokio::task::spawn_blocking(move || u.#method_name(context)).await
+                })
+            }
+            blocking_tasks.push(rocust::rocust_lib::tasks::BlockingTask::new(#priority, #method_name_str, #method_name));
+        }
+    });
+
+    let async_methods = methods.iter().filter(|(_, _, is_async)| *is_async).map(|(method_name, priority, _)| {
         let method_name_str = syn::LitStr::new(&method_name.to_string(), proc_macro2::Span::call_site());
         quote! {
             fn #method_name<'a>(u: &'a mut #struct_name, context: &'a rocust::rocust_lib::test::user::context::Context) -> ::core::pin::Pin<Box<dyn ::core::future::Future<Output = ()> + ::core::marker::Send + 'a>> {
@@ -142,8 +155,14 @@ pub fn has_task(attrs: TokenStream, item: TokenStream) -> TokenStream {
         impl rocust::rocust_lib::traits::HasTask for #struct_name {
             fn get_async_tasks() -> Vec<rocust::rocust_lib::tasks::AsyncTask<Self>> where Self: Sized {
                 let mut async_tasks: Vec<rocust::rocust_lib::tasks::AsyncTask<Self>> = Vec::new();
-                #(#methods)*;
+                #(#async_methods)*;
                 async_tasks
+            }
+
+            fn get_blocking_tasks() -> Vec<rocust::rocust_lib::tasks::BlockingTask<Self>> where Self: Sized {
+                let mut blocking_tasks: Vec<rocust::rocust_lib::tasks::BlockingTask<Self>> = Vec::new();
+                #(#blocking_methods)*;
+                blocking_tasks
             }
 
             fn get_name() -> &'static str {
