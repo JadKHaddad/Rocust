@@ -217,10 +217,7 @@ impl Test {
                                 Test::sleep_between(between).await;
 
                                 // this is the actual task
-                                blocking_task
-                                    .call(blocking_user, blocking_context)
-                                    .await
-                                    .unwrap()
+                                blocking_task.call(blocking_user, blocking_context).await
                             };
                             tokio::select! {
                                 _ = user_token.cancelled() => {
@@ -232,10 +229,25 @@ impl Test {
                                     (user, user_context, true)
                                 }
                                 res = task_call_and_sleep => {
-                                    (res.0, res.1, false)
+                                    match res {
+                                        Ok(res) => {
+                                            user_context.get_events_handler().add_task_executed(
+                                                EventsTaskInfo {
+                                                    name: blocking_task.name,
+                                                },
+                                            );
+                                            (res.0, res.1, false)
+                                        },
+                                        Err(_) => {
+                                            // task call panicked
+                                            (user, user_context, true)
+                                        }
+                                    }
+
                                 }
                             }
                         } else {
+                            // unreachable!
                             (user, user_context, true)
                         };
                     }
