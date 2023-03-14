@@ -628,17 +628,10 @@ impl Test {
             match spawn_users_handles.await {
                 Ok(supervisors) => {
                     for (supervisor, id) in supervisors {
-                        match supervisor.await {
-                            Ok(_) => {}
-                            Err(e) => {
-                                self.user_stats_collection
-                                    .set_user_status(&id, UserStatus::Unknown);
-                                tracing::error!(
-                                    "Error joining supervisor for user [{}]: {}",
-                                    id,
-                                    e
-                                );
-                            }
+                        if let Err(e) = supervisor.await {
+                            self.user_stats_collection
+                                .set_user_status(&id, UserStatus::Unknown);
+                            tracing::error!("Error joining supervisor for user [{}]: {}", id, e);
                         };
                     }
                 }
