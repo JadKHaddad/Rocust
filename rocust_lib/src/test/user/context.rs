@@ -51,7 +51,7 @@ impl Context {
         self.events_handler.add_error(r#type, name, error);
     }
 
-    pub(crate) fn get_events_handler(&self) -> &EventsHandler {
+    pub(crate) fn _get_events_handler(&self) -> &EventsHandler {
         &self.events_handler
     }
 

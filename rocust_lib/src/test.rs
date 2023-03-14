@@ -174,8 +174,7 @@ impl Test {
 
                                     // this is the actual task
                                     task.call(&mut user, &user_context).await;
-                                    user_context
-                                        .get_events_handler()
+                                    events_handler
                                         .add_task_executed(EventsTaskInfo { name: task.name });
                                 };
 
@@ -344,11 +343,8 @@ impl Test {
                             let csv_string = all_results_gaurd.current_results_csv_string();
                             match csv_string {
                                 Ok(csv_string) => {
-                                    match writer.write_all(csv_string.as_bytes()).await {
-                                        Ok(_) => {}
-                                        Err(e) => {
-                                            tracing::error!("Error writing to csv: {}", e);
-                                        }
+                                    if let Err(e) = writer.write_all(csv_string.as_bytes()).await {
+                                        tracing::error!("Error writing to csv: {}", e);
                                     }
                                 }
                                 Err(e) => {
@@ -364,11 +360,8 @@ impl Test {
                                     let csv_string = all_results_gaurd.current_aggrigated_results_with_timestamp_csv_string(&timestamp);
                                     match csv_string {
                                         Ok(csv_string) => {
-                                            match writer.append_all(csv_string.as_bytes()).await {
-                                                Ok(_) => {}
-                                                Err(e) => {
-                                                    tracing::error!("Error writing to csv: {}", e);
-                                                }
+                                            if let Err(e) = writer.append_all(csv_string.as_bytes()).await {
+                                                tracing::error!("Error writing to csv: {}", e);
                                             }
                                         }
                                         Err(e) => {
@@ -386,11 +379,8 @@ impl Test {
                             let prometheus_metrics_string = prometheus_exporter_arc.get_metrics();
                             match prometheus_metrics_string {
                                 Ok(prometheus_metrics_string) => {
-                                    match writer.write_all(prometheus_metrics_string.as_bytes()).await {
-                                        Ok(_) => {}
-                                        Err(e) => {
-                                            tracing::error!("Error writing prometheus current metrics: {}", e);
-                                        }
+                                    if let Err(e) =  writer.write_all(prometheus_metrics_string.as_bytes()).await {
+                                        tracing::error!("Error writing prometheus current metrics: {}", e);
                                     }
                                 }
                                 Err(e) => {
@@ -403,11 +393,8 @@ impl Test {
                             let prometheus_metrics_string = prometheus_exporter_arc.get_metrics();
                             match prometheus_metrics_string {
                                 Ok(prometheus_metrics_string) => {
-                                    match writer.write_all(prometheus_metrics_string.as_bytes()).await {
-                                        Ok(_) => {}
-                                        Err(e) => {
-                                            tracing::error!("Error writing prometheus metrics history: {}", e);
-                                        }
+                                    if let Err(e) = writer.write_all(prometheus_metrics_string.as_bytes()).await {
+                                        tracing::error!("Error writing prometheus metrics history: {}", e);
                                     }
                                 }
                                 Err(e) => {

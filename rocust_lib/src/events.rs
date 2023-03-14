@@ -1,7 +1,8 @@
 use crate::{
     messages::{
         ErrorResultMessage, FailureResultMessage, MainMessage, ResultMessage, SuccessResultMessage,
-        TaskExecutedMessage, UserSelfStoppedMessage, UserSpawnedMessage, UserPanickedMessage, UserFinishedMessage, UserUnknownStatusMessage,
+        TaskExecutedMessage, UserFinishedMessage, UserPanickedMessage, UserSelfStoppedMessage,
+        UserSpawnedMessage, UserUnknownStatusMessage,
     },
     results::EndpointTypeName,
     tasks::EventsTaskInfo,
@@ -80,7 +81,8 @@ impl EventsHandler {
 
     pub(crate) fn add_user_panicked(&self, error: String) {
         self.send(MainMessage::UserPanicked(UserPanickedMessage {
-            user_info: self.user_info.clone(), _error: error,
+            user_info: self.user_info.clone(),
+            _error: error,
         }));
     }
 
