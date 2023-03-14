@@ -174,11 +174,9 @@ impl Test {
 
                                     // this is the actual task
                                     task.call(&mut user, &user_context).await;
-                                    user_context.get_events_handler().add_task_executed(
-                                        EventsTaskInfo {
-                                            name: task.name.clone(),
-                                        },
-                                    );
+                                    user_context
+                                        .get_events_handler()
+                                        .add_task_executed(EventsTaskInfo { name: task.name });
                                 };
 
                                 tokio::select! {
@@ -216,8 +214,7 @@ impl Test {
                                 // very unlikely
                                 supervisor_events_handler.add_user_unknown_status();
                             }
-                        }
-                        // at this point we can decide what to do with the user, maybe restart it?
+                        } // at this point we can decide what to do with the user, maybe restart it?
                     }
                 });
 
