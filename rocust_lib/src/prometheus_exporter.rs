@@ -25,6 +25,12 @@ pub(crate) struct UserLabel {
     pub user_name: &'static str,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, EncodeLabelSet)]
+pub(crate) struct PanicLabel {
+    pub user_id: u64,
+    pub user_name: &'static str,
+}
+
 pub(crate) struct PrometheusExporter {
     registry: Registry,
     request_counter: Family<RequestLabel, Counter<u64>>,
@@ -32,6 +38,7 @@ pub(crate) struct PrometheusExporter {
     error_counter: Family<RequestLabel, Counter<u64>>,
     response_time_gauge: Family<RequestLabel, Gauge<f64, AtomicU64>>,
     task_counter: Family<TaskLabel, Counter<u64>>,
+    panic_counter: Family<PanicLabel, Counter<u64>>,
     user_count_gauge: Family<UserLabel, Gauge>,
 }
 
@@ -68,12 +75,20 @@ impl PrometheusExporter {
             "Total number of tasks, tasks with suicide or panic are not included",
             task_counter.clone(),
         );
+        let panic_counter = Family::<PanicLabel, Counter<u64>>::default();
+        registry.register(
+            "rocust_panics",
+            "Total number of panics by users",
+            panic_counter.clone(),
+        );
+
         let user_count_gauge = Family::<UserLabel, Gauge>::default();
         registry.register(
             "rocust_user_count",
-            "Total Number of users, users that have paincked are not tracked",
+            "Total Number of users",
             user_count_gauge.clone(),
         );
+
         Self {
             registry,
             request_counter,
@@ -81,6 +96,7 @@ impl PrometheusExporter {
             error_counter,
             response_time_gauge,
             task_counter,
+            panic_counter,
             user_count_gauge,
         }
     }
@@ -117,8 +133,11 @@ impl PrometheusExporter {
         self.user_count_gauge.get_or_create(&label).inc();
     }
 
-    // we have no information about panicking users. so we can't remove them. we can use a supervisor to monitor the user's health (meh).
     pub(crate) fn remove_user(&self, label: UserLabel) {
         self.user_count_gauge.get_or_create(&label).dec();
+    }
+
+    pub(crate) fn add_panic(&self, label: PanicLabel) {
+        self.panic_counter.get_or_create(&label).inc();
     }
 }

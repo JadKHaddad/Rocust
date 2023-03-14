@@ -30,6 +30,7 @@ fn log_level_from_env() -> LevelFilter {
 }
 
 // TODO: this is a bit of a mess
+// TODO: REWOOOOOOORK
 pub fn setup_logging(
     log_level: Option<LevelFilter>,
     log_to_stdout: bool,

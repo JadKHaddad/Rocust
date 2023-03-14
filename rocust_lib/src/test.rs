@@ -7,7 +7,7 @@ use crate::{
     fs::{timestamped_writer::TimeStapmedWriter, writer::Writer},
     logging::setup_logging,
     messages::{MainMessage, ResultMessage},
-    prometheus_exporter::{PrometheusExporter, RequestLabel, TaskLabel, UserLabel},
+    prometheus_exporter::{PanicLabel, PrometheusExporter, RequestLabel, TaskLabel, UserLabel},
     results::AllResults,
     server::Server,
     tasks::EventsTaskInfo,
@@ -132,7 +132,7 @@ impl Test {
         let test_config = self.test_config.clone();
         let users_per_sec = test_config.users_per_sec;
         tokio::spawn(async move {
-            let mut handles = vec![];
+            let mut supervisors = vec![];
             let mut users_spawned = 0;
             for i in 0..count {
                 let test_config = test_config.clone();
@@ -147,6 +147,7 @@ impl Test {
                 let user_controller = UserController::new(user_token.clone());
                 let user_info = EventsUserInfo::new(id, T::get_name());
                 let events_handler = EventsHandler::new(user_info, results_tx.clone());
+                let supervisor_events_handler = events_handler.clone();
 
                 // create the data for the user
                 let user_context = Context::new(
@@ -157,46 +158,70 @@ impl Test {
 
                 let tasks = tasks.clone();
                 let shared = shared.clone();
+                let supervisor = tokio::spawn(async move {
+                    let handle = tokio::spawn(async move {
+                        events_handler.add_user_spawned();
+                        let mut user = T::new(&test_config, &user_context, shared).await;
+                        user.on_start(&user_context).await;
 
-                let handle = tokio::spawn(async move {
-                    events_handler.add_user_spawned();
-                    let mut user = T::new(&test_config, &user_context, shared).await;
-                    user.on_start(&user_context).await;
+                        loop {
+                            // get a random task
+                            if let Some(task) = tasks.get_prioritised_random() {
+                                // call it, do some sleep
+                                let task_call_and_sleep = async {
+                                    // this is the sleep time of a user
+                                    Test::sleep_between(between).await;
 
-                    loop {
-                        // get a random task
-                        if let Some(task) = tasks.get_prioritised_random() {
-                            // call it, do some sleep
-                            let task_call_and_sleep = async {
-                                // this is the sleep time of a user
-                                Test::sleep_between(between).await;
+                                    // this is the actual task
+                                    task.call(&mut user, &user_context).await;
+                                    user_context.get_events_handler().add_task_executed(
+                                        EventsTaskInfo {
+                                            name: task.name.clone(),
+                                        },
+                                    );
+                                };
 
-                                // this is the actual task
-                                task.call(&mut user, &user_context).await;
-                                user_context.get_events_handler().add_task_executed(
-                                    EventsTaskInfo {
-                                        name: task.name.clone(),
-                                    },
-                                );
-                            };
-
-                            tokio::select! {
-                                _ = user_token.cancelled() => {
-                                    tracing::info!("User [{}][{}] attempted suicide", T::get_name(), id);
-                                    user_context.get_events_handler().add_user_self_stopped();
-                                    break;
-                                }
-                                _ = test_token_for_user.cancelled() => {
-                                    break;
-                                }
-                                _ = task_call_and_sleep => {
+                                tokio::select! {
+                                    _ = user_token.cancelled() => {
+                                        user.on_stop(&user_context).await;
+                                        return UserStatus::Cancelled;
+                                    }
+                                    _ = test_token_for_user.cancelled() => {
+                                        user.on_stop(&user_context).await;
+                                        return UserStatus::Finished;
+                                    }
+                                    _ = task_call_and_sleep => {
+                                    }
                                 }
                             }
                         }
+                    });
+
+                    match handle.await {
+                        Ok(status) => match status {
+                            UserStatus::Finished => {
+                                supervisor_events_handler.add_user_finished();
+                            }
+                            UserStatus::Cancelled => {
+                                supervisor_events_handler.add_user_self_stopped();
+                            }
+                            _ => {
+                                // well obviously unreachable
+                            }
+                        },
+                        Err(e) => {
+                            if e.is_panic() {
+                                supervisor_events_handler.add_user_panicked(e.to_string());
+                            } else {
+                                // very unlikely
+                                supervisor_events_handler.add_user_unknown_status();
+                            }
+                        }
+                        // at this point we can decide what to do with the user, maybe restart it?
                     }
-                    user.on_stop(&user_context).await;
                 });
-                handles.push((handle, id));
+
+                supervisors.push((supervisor, id));
                 users_spawned += 1;
                 if users_spawned % users_per_sec == 0 {
                     tokio::select! {
@@ -209,7 +234,7 @@ impl Test {
                     }
                 }
             }
-            handles
+            supervisors
         })
     }
 
@@ -505,6 +530,12 @@ impl Test {
                 }
 
                 MainMessage::UserSelfStopped(user_self_stopped_msg) => {
+                    tracing::info!(
+                        "User [{}][{}] attempted suicide",
+                        &user_self_stopped_msg.user_info.name,
+                        &user_self_stopped_msg.user_info.id
+                    );
+
                     self.user_stats_collection.set_user_status(
                         &user_self_stopped_msg.user_info.id,
                         UserStatus::Cancelled,
@@ -512,6 +543,50 @@ impl Test {
 
                     self.prometheus_exporter_arc.remove_user(UserLabel {
                         user_name: user_self_stopped_msg.user_info.name,
+                    });
+
+                    // TODO: self.prometheus_exporter_arc.add_suicide
+                }
+
+                MainMessage::UserFinished(user_finished_msg) => {
+                    self.user_stats_collection
+                        .set_user_status(&user_finished_msg.user_info.id, UserStatus::Finished);
+                }
+
+                MainMessage::UserPanicked(user_panicked_msg) => {
+                    tracing::warn!(
+                        "User [{}][{}] panicked!",
+                        &user_panicked_msg.user_info.name,
+                        &user_panicked_msg.user_info.id
+                    );
+
+                    self.user_stats_collection
+                        .set_user_status(&user_panicked_msg.user_info.id, UserStatus::Panicked);
+
+                    self.prometheus_exporter_arc.remove_user(UserLabel {
+                        user_name: user_panicked_msg.user_info.name,
+                    });
+
+                    self.prometheus_exporter_arc.add_panic(PanicLabel {
+                        user_id: user_panicked_msg.user_info.id,
+                        user_name: user_panicked_msg.user_info.name,
+                    });
+                }
+
+                MainMessage::UserUnknownStatus(user_unknown_status_msg) => {
+                    tracing::warn!(
+                        "User [{}][{}] has unknown status!. Supervisor failed to get user status",
+                        &user_unknown_status_msg.user_info.name,
+                        &user_unknown_status_msg.user_info.id
+                    );
+
+                    self.user_stats_collection.set_user_status(
+                        &user_unknown_status_msg.user_info.id,
+                        UserStatus::Unknown,
+                    );
+
+                    self.prometheus_exporter_arc.remove_user(UserLabel {
+                        user_name: user_unknown_status_msg.user_info.name,
                     });
                 }
             }
@@ -554,26 +629,24 @@ impl Test {
         // wait for all users to finish
         for spawn_users_handles in spawn_users_handles_vec {
             match spawn_users_handles.await {
-                Ok(handles) => {
-                    for (handle, id) in handles {
-                        let status = match handle.await {
-                            Ok(_) => UserStatus::Finished,
+                Ok(supervisors) => {
+                    for (supervisor, id) in supervisors {
+                        match supervisor.await {
+                            Ok(_) => {}
                             Err(e) => {
-                                if e.is_panic() {
-                                    UserStatus::Panicked
-                                } else {
-                                    UserStatus::Unknown
-                                }
-                                // if e.is_cancelled() {
-                                //     UserStatus::Unknown
-                                // }
+                                self.user_stats_collection
+                                    .set_user_status(&id, UserStatus::Unknown);
+                                tracing::error!(
+                                    "Error joining supervisor for user [{}]: {}",
+                                    id,
+                                    e
+                                );
                             }
                         };
-                        self.user_stats_collection.set_user_status(&id, status);
                     }
                 }
                 Err(e) => {
-                    tracing::error!("Error joining users: {}", e);
+                    tracing::error!("Error joining supervisors: {}", e);
                 }
             }
         }

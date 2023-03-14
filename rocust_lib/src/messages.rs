@@ -4,10 +4,26 @@ pub enum MainMessage {
     ResultMessage(ResultMessage),
     UserSpawned(UserSpawnedMessage),
     UserSelfStopped(UserSelfStoppedMessage),
+    UserFinished(UserFinishedMessage),
+    UserPanicked(UserPanickedMessage),
+    UserUnknownStatus(UserUnknownStatusMessage),
     TaskExecuted(TaskExecutedMessage),
 }
 
 pub struct UserSelfStoppedMessage {
+    pub(crate) user_info: EventsUserInfo,
+}
+
+pub struct UserFinishedMessage {
+    pub(crate) user_info: EventsUserInfo,
+}
+
+pub struct UserPanickedMessage {
+    pub(crate) user_info: EventsUserInfo,
+    pub(crate) _error: String,
+}
+
+pub struct UserUnknownStatusMessage {
     pub(crate) user_info: EventsUserInfo,
 }
 

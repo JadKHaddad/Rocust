@@ -81,11 +81,7 @@ impl UserStatsCollection {
     }
 
     pub(crate) fn set_user_status(&mut self, user_id: &u64, status: UserStatus) {
-        // if status is cancelled, we don't want to overwrite it with other statuses
         if let Some(user_stats) = self.user_stats_map.get_mut(user_id) {
-            if user_stats.user_info.status == UserStatus::Cancelled {
-                return;
-            }
             user_stats.user_info.status = status;
         }
     }
