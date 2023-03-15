@@ -1,6 +1,9 @@
 pub mod context;
 
-use crate::results::{AllResults, EndpointTypeName, SerAllResults};
+use crate::{
+    futures::FakeFuture,
+    results::{AllResults, EndpointTypeName, SerAllResults},
+};
 use serde::Serialize;
 use serde_json::Error as SerdeJsonError;
 use serde_yaml::Error as SerdeYamlError;
@@ -203,7 +206,9 @@ impl UserController {
         Self { token }
     }
 
-    pub fn stop(&self) {
+    pub async fn stop(&self) {
         self.token.cancel();
+        // Giving Tokio a break point to stop polling the future.
+        FakeFuture.await;
     }
 }

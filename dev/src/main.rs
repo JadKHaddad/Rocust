@@ -42,21 +42,23 @@ impl GoogleUser {
         match res {
             Ok(res) => {
                 if res.status().is_success() {
-                    context.add_success(
-                        String::from("BLOCKING GET"),
-                        format!("{}/", self.host),
-                        0.0,
-                    );
+                    context
+                        .add_success(String::from("BLOCKING GET"), format!("{}/", self.host), 0.0)
+                        .await;
                 } else {
-                    context.add_failure(String::from("BLOCKING GET"), format!("{}/", self.host));
+                    context
+                        .add_failure(String::from("BLOCKING GET"), format!("{}/", self.host))
+                        .await;
                 }
             }
             Err(_) => {
-                context.add_error(
-                    String::from("BLOCKING GET"),
-                    format!("{}/", self.host),
-                    String::from("error"),
-                );
+                context
+                    .add_error(
+                        String::from("BLOCKING GET"),
+                        format!("{}/", self.host),
+                        String::from("error"),
+                    )
+                    .await;
             }
         }
     }
@@ -75,17 +77,23 @@ impl GoogleUser {
                 if res.status().is_success() {
                     let duration = end.duration_since(start);
                     let duration = duration.as_secs_f64();
-                    context.add_success(String::from("GET"), format!("{}/", self.host), duration);
+                    context
+                        .add_success(String::from("GET"), format!("{}/", self.host), duration)
+                        .await;
                 } else {
-                    context.add_failure(String::from("GET"), format!("{}/", self.host));
+                    context
+                        .add_failure(String::from("GET"), format!("{}/", self.host))
+                        .await;
                 }
             }
             Err(_) => {
-                context.add_error(
-                    String::from("GET"),
-                    format!("{}/", self.host),
-                    String::from("error"),
-                );
+                context
+                    .add_error(
+                        String::from("GET"),
+                        format!("{}/", self.host),
+                        String::from("error"),
+                    )
+                    .await;
             }
         }
     }
@@ -104,36 +112,42 @@ impl GoogleUser {
                 if res.status().is_success() {
                     let duration = end.duration_since(start);
                     let duration = duration.as_secs_f64();
-                    context.add_success(
-                        String::from("GET"),
-                        format!("{}/none_existing_path", self.host),
-                        duration,
-                    );
+                    context
+                        .add_success(
+                            String::from("GET"),
+                            format!("{}/none_existing_path", self.host),
+                            duration,
+                        )
+                        .await;
                 } else {
-                    context.add_failure(
-                        String::from("GET"),
-                        format!("{}/none_existing_path", self.host),
-                    );
+                    context
+                        .add_failure(
+                            String::from("GET"),
+                            format!("{}/none_existing_path", self.host),
+                        )
+                        .await;
                 }
             }
             Err(_) => {
-                context.add_error(
-                    String::from("GET"),
-                    format!("{}/none_existing_path", self.host),
-                    String::from("error"),
-                );
+                context
+                    .add_error(
+                        String::from("GET"),
+                        format!("{}/none_existing_path", self.host),
+                        String::from("error"),
+                    )
+                    .await;
             }
         }
     }
 
-    #[task(priority = 100)]
+    #[task(priority = 40)]
     async fn will_panic(&mut self, _context: &Context) {
         panic!("This task will panic");
     }
 
-    #[task(priority = 1)]
+    #[task(priority = 40)]
     async fn suicide(&mut self, context: &Context) {
-        context.stop();
+        context.stop().await;
     }
 }
 
@@ -179,28 +193,33 @@ impl FacebookUser {
                 if res.status().is_success() {
                     let duration = end.duration_since(start);
                     let duration = duration.as_secs_f64();
-                    context.add_success(
-                        String::from("GET"),
-                        String::from("facebook.com/"),
-                        duration,
-                    );
+                    context
+                        .add_success(String::from("GET"), String::from("facebook.com/"), duration)
+                        .await;
                 } else {
-                    context.add_failure(String::from("GET"), String::from("facebook.com/"));
+                    context
+                        .add_failure(String::from("GET"), String::from("facebook.com/"))
+                        .await;
                 }
             }
             Err(_) => {
-                context.add_error(
-                    String::from("GET"),
-                    String::from("facebook.com/"),
-                    String::from("error"),
-                );
+                context
+                    .add_error(
+                        String::from("GET"),
+                        String::from("facebook.com/"),
+                        String::from("error"),
+                    )
+                    .await;
             }
         }
     }
 
     #[task(priority = 50)]
     async fn suicide(&mut self, context: &Context) {
-        context.stop();
+        context.stop().await;
+        loop {
+
+        }
     }
 }
 
@@ -230,11 +249,11 @@ async fn main() {
     // console_subscriber::init();
 
     let test_config = TestConfig::default()
-        .user_count(50)
-        .users_per_sec(1)
+        .user_count(10)
+        .users_per_sec(2)
         .runtime(6000)
         .update_interval_in_secs(2)
-        .print_to_stdout(true)
+        .print_to_stdout(false)
         .log_to_stdout(true)
         .log_level(tracing::level_filters::LevelFilter::INFO)
         .log_file(String::from("results/log.log"))
@@ -271,7 +290,7 @@ async fn main() {
         test_controller.stop();
     });
 
-    run!(test, GoogleUser, FacebookUser).await;
+    run!(test, /*GoogleUser,*/ FacebookUser).await;
 
     // tokio::time::sleep(std::time::Duration::from_secs(60)).await;
 }

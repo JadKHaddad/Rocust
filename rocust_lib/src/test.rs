@@ -105,7 +105,7 @@ impl Test {
         &self,
         count: u64,
         starting_index: u64,
-        results_tx: mpsc::UnboundedSender<MainMessage>,
+        results_tx: mpsc::Sender<MainMessage>,
         test_controller: Arc<TestController>,
         shared: S,
     ) -> JoinHandle<Vec<(JoinHandle<()>, u64)>>
@@ -160,7 +160,7 @@ impl Test {
                 let shared = shared.clone();
                 let supervisor = tokio::spawn(async move {
                     let handle = tokio::spawn(async move {
-                        events_handler.add_user_spawned();
+                        events_handler.add_user_spawned().await;
                         let mut user = T::new(&test_config, &user_context, shared).await;
                         user.on_start(&user_context).await;
 
@@ -174,8 +174,6 @@ impl Test {
 
                                     // this is the actual task
                                     task.call(&mut user, &user_context).await;
-                                    events_handler
-                                        .add_task_executed(EventsTaskInfo { name: task.name });
                                 };
 
                                 tokio::select! {
@@ -188,6 +186,8 @@ impl Test {
                                         return UserStatus::Finished;
                                     }
                                     _ = task_call_and_sleep => {
+                                        events_handler
+                                        .add_task_executed(EventsTaskInfo { name: task.name }).await;
                                     }
                                 }
                             }
@@ -197,10 +197,10 @@ impl Test {
                     match handle.await {
                         Ok(status) => match status {
                             UserStatus::Finished => {
-                                supervisor_events_handler.add_user_finished();
+                                supervisor_events_handler.add_user_finished().await;
                             }
                             UserStatus::Cancelled => {
-                                supervisor_events_handler.add_user_self_stopped();
+                                supervisor_events_handler.add_user_self_stopped().await;
                             }
                             _ => {
                                 // well obviously unreachable
@@ -208,10 +208,12 @@ impl Test {
                         },
                         Err(e) => {
                             if e.is_panic() {
-                                supervisor_events_handler.add_user_panicked(e.to_string());
+                                supervisor_events_handler
+                                    .add_user_panicked(e.to_string())
+                                    .await;
                             } else {
                                 // very unlikely
-                                supervisor_events_handler.add_user_unknown_status();
+                                supervisor_events_handler.add_user_unknown_status().await;
                             }
                         } // at this point we can decide what to do with the user, maybe restart it?
                     }
@@ -417,7 +419,7 @@ impl Test {
         })
     }
 
-    async fn block_on_reciever(&mut self, mut results_rx: mpsc::UnboundedReceiver<MainMessage>) {
+    async fn block_on_reciever(&mut self, mut results_rx: mpsc::Receiver<MainMessage>) {
         while let Some(msg) = results_rx.recv().await {
             match msg {
                 MainMessage::ResultMessage(result_msg) => {
@@ -579,18 +581,15 @@ impl Test {
 
     pub async fn before_spawn_users(
         &self,
-    ) -> (
-        mpsc::UnboundedSender<MainMessage>,
-        mpsc::UnboundedReceiver<MainMessage>,
-    ) {
+    ) -> (mpsc::Sender<MainMessage>, mpsc::Receiver<MainMessage>) {
         // set timestamp
         *self.start_timestamp_arc_rwlock.write().await = Instant::now();
-        mpsc::unbounded_channel()
+        mpsc::channel(100)
     }
 
     pub async fn after_spawn_users(
         &mut self,
-        results_rx: mpsc::UnboundedReceiver<MainMessage>,
+        results_rx: mpsc::Receiver<MainMessage>,
         spawn_users_handles_vec: SpawnUsersHandlesVector,
         total_spawnable_user_count: u64,
     ) {

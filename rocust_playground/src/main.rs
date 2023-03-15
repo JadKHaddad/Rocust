@@ -10,7 +10,7 @@ struct MyUser {
 #[allow(clippy::all)]
 impl MyUser {
     async fn suicide(&mut self, context: &Context) {
-        context.stop();
+        context.stop().await;
     }
 
     fn blocking(mut self, context: Context) -> (Self, Context) {

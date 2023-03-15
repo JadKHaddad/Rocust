@@ -31,24 +31,26 @@ impl Context {
         }
     }
 
-    pub fn stop(&self) {
-        self.user_controller.stop();
+    pub async fn stop(&self) {
+        self.user_controller.stop().await;
     }
 
     pub fn stop_test(&self) {
         self.test_controller.stop();
     }
 
-    pub fn add_success(&self, r#type: String, name: String, response_time: f64) {
-        self.events_handler.add_success(r#type, name, response_time);
+    pub async fn add_success(&self, r#type: String, name: String, response_time: f64) {
+        self.events_handler
+            .add_success(r#type, name, response_time)
+            .await;
     }
 
-    pub fn add_failure(&self, r#type: String, name: String) {
-        self.events_handler.add_failure(r#type, name);
+    pub async fn add_failure(&self, r#type: String, name: String) {
+        self.events_handler.add_failure(r#type, name).await;
     }
 
-    pub fn add_error(&self, r#type: String, name: String, error: String) {
-        self.events_handler.add_error(r#type, name, error);
+    pub async fn add_error(&self, r#type: String, name: String, error: String) {
+        self.events_handler.add_error(r#type, name, error).await;
     }
 
     pub(crate) fn _get_events_handler(&self) -> &EventsHandler {
