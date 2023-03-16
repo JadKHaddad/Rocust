@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use reqwest::Client;
 use rocust::{
-    rocust_lib::{run, Context, Shared, Test, TestConfig, User},
+    rocust_lib::{futures::TimedExt, run, Context, Shared, Test, TestConfig, User},
     rocust_macros::has_task,
 };
 use std::{net::SocketAddr, sync::Arc};
@@ -30,7 +30,7 @@ struct GoogleUser {
 
 #[has_task(min_sleep = 1, max_sleep = 2, weight = 1)]
 impl GoogleUser {
-    #[task(priority = 40)]
+    #[task(priority = 10)]
     pub async fn blocking_index(&mut self, context: &Context) {
         println!("GoogleUser [{}] performing blocking", self.id);
         let host = self.host;
@@ -63,22 +63,21 @@ impl GoogleUser {
         }
     }
 
-    #[task(priority = 40)]
+    #[task(priority = 10)]
     pub async fn index(&mut self, context: &Context) {
-        let start = std::time::Instant::now();
-        let res = self
+        let (res, elapsed) = self
             .client
             .get(format!("https://{}", self.host))
             .send()
+            .timed()
             .await;
-        let end = std::time::Instant::now();
+
         match res {
             Ok(res) => {
                 if res.status().is_success() {
-                    let duration = end.duration_since(start);
-                    let duration = duration.as_secs_f64();
+                    let elapsed = elapsed.as_secs_f64();
                     context
-                        .add_success(String::from("GET"), format!("{}/", self.host), duration)
+                        .add_success(String::from("GET"), format!("{}/", self.host), elapsed)
                         .await;
                 } else {
                     context
@@ -98,25 +97,24 @@ impl GoogleUser {
         }
     }
 
-    #[task(priority = 40)]
+    #[task(priority = 10)]
     pub async fn none_existing_path(&mut self, context: &Context) {
-        let start = std::time::Instant::now();
-        let res = self
+        let (res, elapsed) = self
             .client
             .get(format!("https://{}/none_existing_path", self.host))
             .send()
+            .timed()
             .await;
-        let end = std::time::Instant::now();
+
         match res {
             Ok(res) => {
                 if res.status().is_success() {
-                    let duration = end.duration_since(start);
-                    let duration = duration.as_secs_f64();
+                    let elapsed = elapsed.as_secs_f64();
                     context
                         .add_success(
                             String::from("GET"),
                             format!("{}/none_existing_path", self.host),
-                            duration,
+                            elapsed,
                         )
                         .await;
                 } else {
@@ -140,12 +138,12 @@ impl GoogleUser {
         }
     }
 
-    #[task(priority = 40)]
+    #[task(priority = 1)]
     async fn will_panic(&mut self, _context: &Context) {
         panic!("This task will panic");
     }
 
-    #[task(priority = 40)]
+    #[task(priority = 1)]
     async fn suicide(&mut self, context: &Context) {
         context.stop().await;
     }
@@ -179,22 +177,20 @@ struct FacebookUser {
 
 #[has_task(min_sleep = 1, max_sleep = 2, weight = 1)]
 impl FacebookUser {
-    #[task(priority = 1)]
+    #[task(priority = 10)]
     pub async fn index(&mut self, context: &Context) {
-        let start = std::time::Instant::now();
-        let res = self
+        let (res, elapsed) = self
             .client
             .get(String::from("https://facebook.com"))
             .send()
+            .timed()
             .await;
-        let end = std::time::Instant::now();
         match res {
             Ok(res) => {
                 if res.status().is_success() {
-                    let duration = end.duration_since(start);
-                    let duration = duration.as_secs_f64();
+                    let elapsed = elapsed.as_secs_f64();
                     context
-                        .add_success(String::from("GET"), String::from("facebook.com/"), duration)
+                        .add_success(String::from("GET"), String::from("facebook.com/"), elapsed)
                         .await;
                 } else {
                     context
@@ -214,7 +210,7 @@ impl FacebookUser {
         }
     }
 
-    #[task(priority = 50)]
+    #[task(priority = 1)]
     async fn suicide(&mut self, context: &Context) {
         context.stop().await;
         unreachable!();
@@ -241,7 +237,7 @@ impl User for FacebookUser {
 #[tokio::main]
 async fn main() {
     if std::env::var_os("RUST_LOG").is_none() {
-        std::env::set_var("RUST_LOG", "rocust=trace");
+        std::env::set_var("RUST_LOG", "rocust=info");
     }
     tracing_subscriber::fmt::init();
 
@@ -250,7 +246,7 @@ async fn main() {
         .users_per_sec(2)
         .runtime(6000)
         .update_interval_in_secs(2)
-        .print_to_stdout(false)
+        .print_to_stdout(true)
         .current_results_file(String::from("results/current_results.csv"))
         .results_history_file(String::from("results/results_history.csv"))
         .summary_file(String::from("results/summary.json"))
