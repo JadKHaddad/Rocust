@@ -1,7 +1,7 @@
 pub mod context;
 
 use crate::{
-    futures::FakeFuture,
+    futures::BreakPoint,
     results::{AllResults, EndpointTypeName, SerAllResults},
 };
 use serde::Serialize;
@@ -209,6 +209,6 @@ impl UserController {
     pub async fn stop(&self) {
         self.token.cancel();
         // Giving Tokio a break point to stop polling the future.
-        FakeFuture.await;
+        BreakPoint.await;
     }
 }

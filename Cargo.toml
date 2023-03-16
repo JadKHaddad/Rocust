@@ -5,6 +5,5 @@ members = [
     "rocust",
     "rocust_lib",
     "rocust_macros",
-    "rocust_playground",
-    "rocust_condition_parser"
+    "rocust_playground"
 ]

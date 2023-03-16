@@ -13,7 +13,6 @@ pub struct TestConfig {
     pub runtime: Option<u64>,
     pub update_interval_in_secs: u64,
     pub print_to_stdout: bool,
-    pub log_to_stdout: bool,
     pub current_results_file: Option<String>,
     pub results_history_file: Option<String>,
     pub summary_file: Option<String>,
@@ -31,7 +30,6 @@ impl Default for TestConfig {
             runtime: None,
             update_interval_in_secs: 1,
             print_to_stdout: true,
-            log_to_stdout: true,
             current_results_file: None,
             results_history_file: None,
             summary_file: None,
@@ -71,13 +69,6 @@ impl TestConfig {
     pub fn print_to_stdout(self, print_to_stdout: bool) -> Self {
         Self {
             print_to_stdout,
-            ..self
-        }
-    }
-
-    pub fn log_to_stdout(self, log_to_stdout: bool) -> Self {
-        Self {
-            log_to_stdout,
             ..self
         }
     }
@@ -209,7 +200,6 @@ impl TryFrom<ExternalTestConfig> for TestConfig {
             runtime: external_test_config.runtime,
             update_interval_in_secs: external_test_config.update_interval_in_secs,
             print_to_stdout: !external_test_config.no_print_to_stdout,
-            log_to_stdout: !external_test_config.no_log_to_stdout,
             current_results_file: external_test_config.current_results_file,
             results_history_file: external_test_config.results_history_file,
             summary_file: external_test_config.summary_file,

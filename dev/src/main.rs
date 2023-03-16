@@ -179,7 +179,7 @@ struct FacebookUser {
 
 #[has_task(min_sleep = 1, max_sleep = 2, weight = 1)]
 impl FacebookUser {
-    #[task(priority = 10)]
+    #[task(priority = 1)]
     pub async fn index(&mut self, context: &Context) {
         let start = std::time::Instant::now();
         let res = self
@@ -251,7 +251,6 @@ async fn main() {
         .runtime(6000)
         .update_interval_in_secs(2)
         .print_to_stdout(false)
-        .log_to_stdout(true)
         .current_results_file(String::from("results/current_results.csv"))
         .results_history_file(String::from("results/results_history.csv"))
         .summary_file(String::from("results/summary.json"))
@@ -274,5 +273,5 @@ async fn main() {
         test_controller.stop();
     });
 
-    run!(test, GoogleUser, FacebookUser).await;
+    run!(test, FacebookUser , GoogleUser).await;
 }
