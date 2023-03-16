@@ -1,7 +1,6 @@
 pub mod events;
 pub(crate) mod fs;
 pub(crate) mod futures;
-pub(crate) mod logging;
 pub(crate) mod messages;
 pub(crate) mod prometheus_exporter;
 pub mod results;
@@ -18,9 +17,6 @@ pub use traits::{Shared, User};
 macro_rules! run {
     ($test:ident, $user_type:ty $(,$user_types:ty)*) => {
         async {
-            // set up the logger
-            $test.setup_logging();
-
             let (results_tx, results_rx) = $test.before_spawn_users().await;
 
             // create the shared data for the Data struct for each user

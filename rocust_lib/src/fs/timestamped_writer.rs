@@ -1,7 +1,7 @@
-use crate::{fs::writer::Writer, utils::get_timestamp_as_millis_as_string};
+use crate::{fs::writer::Writer, utils};
 use std::{path::PathBuf, time::SystemTimeError};
 use thiserror::Error as ThisError;
-use tokio::fs::create_dir_all;
+use tokio::fs;
 
 use super::writer::{CreateError, WriteError as WriterWriteError};
 
@@ -15,7 +15,7 @@ pub(crate) struct TimeStapmedWriter {
 
 impl TimeStapmedWriter {
     async fn new(path: PathBuf, file_name: String) -> Result<Self, CreateError> {
-        create_dir_all(&path).await?;
+        fs::create_dir_all(&path).await?;
         Ok(TimeStapmedWriter { path, file_name })
     }
 
@@ -24,7 +24,7 @@ impl TimeStapmedWriter {
     }
 
     pub(crate) async fn write_all(&self, data: &[u8]) -> Result<(), WriteError> {
-        let timestamp = get_timestamp_as_millis_as_string()?;
+        let timestamp = utils::get_timestamp_as_millis_as_string()?;
         let path = self.path.join(format!("{}_{}", timestamp, self.file_name));
         let writer = Writer::new(path).await?;
         writer.write_all(data).await?;

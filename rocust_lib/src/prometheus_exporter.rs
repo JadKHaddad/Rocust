@@ -1,5 +1,5 @@
 use prometheus_client::{
-    encoding::{text::encode, EncodeLabelSet},
+    encoding::{text, EncodeLabelSet},
     metrics::{counter::Counter, family::Family, gauge::Gauge},
     registry::Registry,
 };
@@ -103,7 +103,7 @@ impl PrometheusExporter {
 
     pub(crate) fn get_metrics(&self) -> Result<String, FmtError> {
         let mut buffer = String::new();
-        encode(&mut buffer, &self.registry)?;
+        text::encode(&mut buffer, &self.registry)?;
         Ok(buffer)
     }
 

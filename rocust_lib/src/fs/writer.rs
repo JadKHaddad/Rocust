@@ -1,7 +1,7 @@
 use std::{io::Error as StdIoError, path::PathBuf};
 use thiserror::Error as ThisError;
 use tokio::{
-    fs::{create_dir_all, File, OpenOptions},
+    fs::{self, File, OpenOptions},
     io::{AsyncWriteExt, Error as TokioIoError},
 };
 
@@ -13,7 +13,7 @@ pub(crate) struct Writer {
 impl Writer {
     pub(crate) async fn new(path: PathBuf) -> Result<Self, CreateError> {
         if let Some(parent) = path.parent() {
-            create_dir_all(parent).await?;
+            fs::create_dir_all(parent).await?;
         }
         Ok(Writer { path })
     }

@@ -217,9 +217,7 @@ impl FacebookUser {
     #[task(priority = 50)]
     async fn suicide(&mut self, context: &Context) {
         context.stop().await;
-        loop {
-
-        }
+        loop {}
     }
 }
 
@@ -242,11 +240,10 @@ impl User for FacebookUser {
 
 #[tokio::main]
 async fn main() {
-    // export RUSTFLAGS="--cfg tokio_unstable"
-    // export ROCUST_LOG="debug"
-    // $Env:RUSTFLAGS="--cfg tokio_unstable"
-    // $Env:ROCUST_LOG="info"
-    // console_subscriber::init();
+    if std::env::var_os("RUST_LOG").is_none() {
+        std::env::set_var("RUST_LOG", "rocust=debug");
+    }
+    tracing_subscriber::fmt::init();
 
     let test_config = TestConfig::default()
         .user_count(10)
@@ -255,8 +252,6 @@ async fn main() {
         .update_interval_in_secs(2)
         .print_to_stdout(false)
         .log_to_stdout(true)
-        .log_level(tracing::level_filters::LevelFilter::INFO)
-        .log_file(String::from("results/log.log"))
         .current_results_file(String::from("results/current_results.csv"))
         .results_history_file(String::from("results/results_history.csv"))
         .summary_file(String::from("results/summary.json"))
@@ -265,20 +260,9 @@ async fn main() {
         .server_address(SocketAddr::from(([127, 0, 0, 1], 3000)))
         .additional_args(vec![])
         .additional_arg(String::from("test"));
-    // .stop_condition(|stop_condition_data| {
-    //     if stop_condition_data
-    //         .get_all_results()
-    //         .get_aggrigated_results()
-    //         .get_total_failed_requests()
-    //         >= 200
-    //     {
-    //         return true;
-    //     }
-    //     false
-    // });
 
-    // or get test config from CLI. stop_condition will be ignored for now (will be implemented later)
-    // cargo run -p dev -- --user-count 20 --users-per-sec 4 --runtime 60 --update-interval-in-secs 3 --log-level "debug" --log-file "results/log.log" --current-results-file "results/current_results.csv" --results-history-file "results/results_history.csv" --summary-file "results/summary.json" --server-address "127.0.0.1:8080" --additional-arg "arg1" --additional-arg "arg2"
+    // or get test config from CLI.
+    // cargo run -p dev -- --user-count 20 --users-per-sec 4 --runtime 60 --update-interval-in-secs 3 --current-results-file "results/current_results.csv" --results-history-file "results/results_history.csv" --summary-file "results/summary.json" --server-address "127.0.0.1:8080" --additional-arg "arg1" --additional-arg "arg2"
     // let test_config = TestConfig::from_cli_args().expect("Failed to get test config from CLI args");
 
     let mut test = Test::new(test_config).await;
@@ -290,7 +274,5 @@ async fn main() {
         test_controller.stop();
     });
 
-    run!(test, /*GoogleUser,*/ FacebookUser).await;
-
-    // tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+    run!(test, GoogleUser, FacebookUser).await;
 }

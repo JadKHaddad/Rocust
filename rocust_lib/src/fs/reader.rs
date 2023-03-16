@@ -1,7 +1,7 @@
 use std::{io::Error as StdIoError, path::PathBuf};
 use thiserror::Error as ThisError;
 use tokio::{
-    fs::{create_dir_all, File},
+    fs::{self, File},
     io::{AsyncReadExt, Error as TokioIoError},
 };
 
@@ -12,7 +12,7 @@ pub(crate) struct Reader {
 impl Reader {
     async fn new(path: PathBuf) -> Result<Self, CreateError> {
         if let Some(parent) = path.parent() {
-            create_dir_all(parent).await?;
+            fs::create_dir_all(parent).await?;
         }
         Ok(Reader { path })
     }

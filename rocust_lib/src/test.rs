@@ -5,7 +5,6 @@ pub mod user;
 use crate::{
     events::EventsHandler,
     fs::{timestamped_writer::TimeStapmedWriter, writer::Writer},
-    logging::setup_logging,
     messages::{MainMessage, ResultMessage},
     prometheus_exporter::{PanicLabel, PrometheusExporter, RequestLabel, TaskLabel, UserLabel},
     results::AllResults,
@@ -13,7 +12,7 @@ use crate::{
     tasks::EventsTaskInfo,
     test::config::SupportedExtension,
     traits::{HasTask, PrioritisedRandom, Shared, User},
-    utils::{get_extension_from_filename, get_timestamp_as_millis_as_string},
+    utils,
 };
 use rand::Rng;
 use std::{str::FromStr, sync::Arc, time::Duration};
@@ -24,11 +23,10 @@ use tokio::{
     time::Instant,
 };
 use tokio_util::sync::CancellationToken;
-use tracing_appender::non_blocking::WorkerGuard;
 
 use self::{
     config::TestConfig,
-    controller::{StopConditionData, TestController},
+    controller::TestController,
     user::{context::Context, EventsUserInfo, UserController, UserStatsCollection, UserStatus},
 };
 
@@ -41,8 +39,6 @@ pub struct Test {
     all_results_arc_rwlock: Arc<RwLock<AllResults>>,
     user_stats_collection: UserStatsCollection,
     start_timestamp_arc_rwlock: Arc<RwLock<Instant>>,
-    // on test drop, the worker guard will be dropped, which will stop the logging thread
-    async_log_writer_worker_guard: Option<WorkerGuard>,
     prometheus_exporter_arc: Arc<PrometheusExporter>,
 }
 
@@ -65,7 +61,6 @@ impl Test {
             all_results_arc_rwlock: Arc::new(RwLock::new(AllResults::default())),
             user_stats_collection: UserStatsCollection::new(),
             start_timestamp_arc_rwlock: Arc::new(RwLock::new(Instant::now())),
-            async_log_writer_worker_guard: None,
             prometheus_exporter_arc: Arc::new(PrometheusExporter::new()),
         }
     }
@@ -90,14 +85,6 @@ impl Test {
         }
         let sleep_time = rand::thread_rng().gen_range(between.0..=between.1);
         tokio::time::sleep(Duration::from_secs(sleep_time)).await;
-    }
-
-    pub fn setup_logging(&mut self) {
-        self.async_log_writer_worker_guard = setup_logging(
-            self.test_config.log_level,
-            self.test_config.log_to_stdout,
-            self.test_config.log_file.clone(),
-        );
     }
 
     // TODO: this method spawns users with a spawn rate, that depends on the user type and not the global spawn rate for all given users
@@ -357,7 +344,7 @@ impl Test {
 
                         // write results history to csv
                         if let Some(writer) = &results_history_writer {
-                            match get_timestamp_as_millis_as_string() {
+                            match utils::get_timestamp_as_millis_as_string() {
                                 Ok(timestamp) => {
                                     let csv_string = all_results_gaurd.current_aggrigated_results_with_timestamp_csv_string(&timestamp);
                                     match csv_string {
@@ -402,15 +389,6 @@ impl Test {
                                 Err(e) => {
                                     tracing::error!("Error getting prometheus string: {}", e);
                                 }
-                            }
-                        }
-
-                        // check stop condition and stop if needed
-                        if let Some(stop_condition) = &test_config.stop_condition {
-                            let stop_condition_data = StopConditionData::new(&all_results_gaurd, &elapsed_time);
-                            if stop_condition(stop_condition_data) {
-                                tracing::info!("Stop condition met");
-                                token.cancel();
                             }
                         }
                     }
@@ -655,7 +633,7 @@ impl Test {
                 .calculate_on_update_interval(&elapsed_time);
 
             let extension = SupportedExtension::from_str(
-                get_extension_from_filename(summary_writer.get_path()).unwrap_or(""),
+                utils::get_extension_from_filename(summary_writer.get_path()).unwrap_or(""),
             )
             .unwrap_or(SupportedExtension::Json);
             let summary_string = match extension {
