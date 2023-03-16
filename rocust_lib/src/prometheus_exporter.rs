@@ -85,7 +85,7 @@ impl PrometheusExporter {
 
         let suicide_counter = Family::<UserLabel, Counter<u64>>::default();
         registry.register(
-            "rocust_suicide",
+            "rocust_suicides",
             "Total number of suicides by users",
             panic_counter.clone(),
         );

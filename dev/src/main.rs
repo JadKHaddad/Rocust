@@ -217,7 +217,7 @@ impl FacebookUser {
     #[task(priority = 50)]
     async fn suicide(&mut self, context: &Context) {
         context.stop().await;
-        loop {}
+        unreachable!();
     }
 }
 
