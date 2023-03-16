@@ -21,12 +21,12 @@ pub(crate) struct TaskLabel {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, EncodeLabelSet)]
-pub(crate) struct UserLabel {
+pub(crate) struct UserCountLabel {
     pub user_name: &'static str,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, EncodeLabelSet)]
-pub(crate) struct PanicLabel {
+pub(crate) struct UserLabel {
     pub user_id: u64,
     pub user_name: &'static str,
 }
@@ -38,8 +38,9 @@ pub(crate) struct PrometheusExporter {
     error_counter: Family<RequestLabel, Counter<u64>>,
     response_time_gauge: Family<RequestLabel, Gauge<f64, AtomicU64>>,
     task_counter: Family<TaskLabel, Counter<u64>>,
-    panic_counter: Family<PanicLabel, Counter<u64>>,
-    user_count_gauge: Family<UserLabel, Gauge>,
+    panic_counter: Family<UserLabel, Counter<u64>>,
+    suicide_counter: Family<UserLabel, Counter<u64>>,
+    user_count_gauge: Family<UserCountLabel, Gauge>,
 }
 
 impl PrometheusExporter {
@@ -75,14 +76,21 @@ impl PrometheusExporter {
             "Total number of tasks, tasks with suicide or panic are not included",
             task_counter.clone(),
         );
-        let panic_counter = Family::<PanicLabel, Counter<u64>>::default();
+        let panic_counter = Family::<UserLabel, Counter<u64>>::default();
         registry.register(
             "rocust_panics",
             "Total number of panics by users",
             panic_counter.clone(),
         );
 
-        let user_count_gauge = Family::<UserLabel, Gauge>::default();
+        let suicide_counter = Family::<UserLabel, Counter<u64>>::default();
+        registry.register(
+            "rocust_suicide",
+            "Total number of suicides by users",
+            panic_counter.clone(),
+        );
+
+        let user_count_gauge = Family::<UserCountLabel, Gauge>::default();
         registry.register(
             "rocust_user_count",
             "Total Number of users",
@@ -97,6 +105,7 @@ impl PrometheusExporter {
             response_time_gauge,
             task_counter,
             panic_counter,
+            suicide_counter,
             user_count_gauge,
         }
     }
@@ -129,15 +138,19 @@ impl PrometheusExporter {
         self.task_counter.get_or_create(&label).inc();
     }
 
-    pub(crate) fn add_user(&self, label: UserLabel) {
+    pub(crate) fn add_user(&self, label: UserCountLabel) {
         self.user_count_gauge.get_or_create(&label).inc();
     }
 
-    pub(crate) fn remove_user(&self, label: UserLabel) {
+    pub(crate) fn remove_user(&self, label: UserCountLabel) {
         self.user_count_gauge.get_or_create(&label).dec();
     }
 
-    pub(crate) fn add_panic(&self, label: PanicLabel) {
+    pub(crate) fn add_panic(&self, label: UserLabel) {
         self.panic_counter.get_or_create(&label).inc();
+    }
+
+    pub(crate) fn add_suicide(&self, label: UserLabel) {
+        self.suicide_counter.get_or_create(&label).inc();
     }
 }

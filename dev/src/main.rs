@@ -241,7 +241,7 @@ impl User for FacebookUser {
 #[tokio::main]
 async fn main() {
     if std::env::var_os("RUST_LOG").is_none() {
-        std::env::set_var("RUST_LOG", "rocust=debug");
+        std::env::set_var("RUST_LOG", "rocust=trace");
     }
     tracing_subscriber::fmt::init();
 
@@ -273,5 +273,5 @@ async fn main() {
         test_controller.stop();
     });
 
-    run!(test, FacebookUser , GoogleUser).await;
+    run!(test, FacebookUser, GoogleUser).await;
 }

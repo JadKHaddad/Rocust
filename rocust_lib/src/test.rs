@@ -6,7 +6,7 @@ use crate::{
     events::EventsHandler,
     fs::{timestamped_writer::TimeStapmedWriter, writer::Writer},
     messages::{MainMessage, ResultMessage},
-    prometheus_exporter::{PanicLabel, PrometheusExporter, RequestLabel, TaskLabel, UserLabel},
+    prometheus_exporter::{PrometheusExporter, RequestLabel, TaskLabel, UserCountLabel, UserLabel},
     results::AllResults,
     server::Server,
     tasks::EventsTaskInfo,
@@ -42,7 +42,8 @@ pub struct Test {
     prometheus_exporter_arc: Arc<PrometheusExporter>,
 }
 
-pub struct Writers {
+#[derive(Clone)]
+pub(crate) struct Writers {
     current_results_writer: Option<Writer>,
     results_history_writer: Option<Writer>,
     summary_writer: Option<Writer>,
@@ -101,15 +102,18 @@ impl Test {
         S: Shared,
     {
         tracing::info!(
-            "Spawning [{}][{}] users, starting at index [{}]",
-            count,
-            T::get_name(),
-            starting_index
+            user_name = T::get_name(),
+            user_count = count,
+            %starting_index,
+            "Spawning users",
         );
         let tasks = Arc::new(T::get_async_tasks());
         if tasks.is_empty() {
             // TODO: total users spawned will always be logged since it will never reach total spawnbale users
-            tracing::warn!("User [{}] has no tasks. Will not be spawned", T::get_name());
+            tracing::warn!(
+                user_name = T::get_name(),
+                "User has no tasks. Will not be spawned"
+            );
             return tokio::spawn(async move { vec![] }); // just to avoid an infinite loop
         }
         let between = T::get_between();
@@ -225,14 +229,14 @@ impl Test {
 
     fn start_timer(&self) -> JoinHandle<()> {
         let token = self.token.clone();
+        tracing::info!(runtime = self.test_config.runtime, "Starting timer");
         match self.test_config.runtime {
             Some(runtime) => {
-                tracing::info!("Runtime: {}s", runtime);
                 tokio::spawn(async move {
                     tokio::select! {
                         // this could be ctrl+c or any other signal
                         _ = token.cancelled() => {
-                            tracing::info!("Received signal");
+                            tracing::debug!("Signal received");
                         }
                         // this is the run time
                         _ = tokio::time::sleep(std::time::Duration::from_secs(runtime)) => {
@@ -243,11 +247,10 @@ impl Test {
                 })
             }
             None => {
-                tracing::info!("Runtime: infinite");
                 tokio::spawn(async move {
                     // this could be ctrl+c or any other signal
                     token.cancelled().await;
-                    tracing::info!("Received signal");
+                    tracing::debug!("Signal received");
                 })
             }
         }
@@ -260,7 +263,7 @@ impl Test {
         let addr = self.test_config.server_address;
         match addr {
             Some(addr) => {
-                tracing::info!("Server listening on [{}]", addr);
+                tracing::info!(address = ?addr, "Starting server");
                 tokio::spawn(async move {
                     let server = Server::new(
                         test_controller,
@@ -270,8 +273,8 @@ impl Test {
                     );
                     // no tokio::select! here because axum is running with graceful shutdown
                     let res = server.run().await;
-                    if let Err(e) = res {
-                        tracing::error!("Server error: {}", e);
+                    if let Err(error) = res {
+                        tracing::error!(%error, "Server error");
                     }
                 })
             }
@@ -290,12 +293,7 @@ impl Test {
         let prometheus_exporter_arc = self.prometheus_exporter_arc.clone();
         let start_timestamp_arc_rwlock = self.start_timestamp_arc_rwlock.clone();
         let test_config = self.test_config.clone();
-        let current_results_writer = self.writers.current_results_writer.clone();
-        let results_history_writer = self.writers.results_history_writer.clone();
-        let prometheus_current_metrics_writer =
-            self.writers.prometheus_current_metrics_writer.clone();
-        let prometheus_metrics_history_writer =
-            self.writers.prometheus_metrics_history_writer.clone();
+        let writers = self.writers.clone();
         tokio::spawn(async move {
             let mut print_total_spawned_users = true;
             loop {
@@ -307,9 +305,9 @@ impl Test {
 
                         if print_total_spawned_users {
                             let total_users_spawned_gaurd = total_users_spawned_arc_rwlock.read().await;
-                            tracing::info!("Total users spawned: [{}/{}]", *total_users_spawned_gaurd, total_spawnable_user_count);
+                            tracing::info!(total_users_spawned=*total_users_spawned_gaurd,total_spawnable_users=total_spawnable_user_count,  "Spawning users");
                             if *total_users_spawned_gaurd == total_spawnable_user_count {
-                                tracing::info!("All users spawned [{}]", total_spawnable_user_count);
+                                tracing::info!(total_spawnable_users=total_spawnable_user_count, "All users spawned");
                                 print_total_spawned_users = false;
                             }
                         }
@@ -328,66 +326,66 @@ impl Test {
                         }
 
                         // write current results to csv
-                        if let Some(writer) = &current_results_writer {
+                        if let Some(writer) = &writers.current_results_writer {
                             let csv_string = all_results_gaurd.current_results_csv_string();
                             match csv_string {
                                 Ok(csv_string) => {
-                                    if let Err(e) = writer.write_all(csv_string.as_bytes()).await {
-                                        tracing::error!("Error writing to csv: {}", e);
+                                    if let Err(error) = writer.write_all(csv_string.as_bytes()).await {
+                                        tracing::error!(%error, "Error writing to csv");
                                     }
                                 }
-                                Err(e) => {
-                                    tracing::error!("Error getting csv string: {}", e);
+                                Err(error) => {
+                                    tracing::error!(%error, "Error getting csv string");
                                 }
                             }
                         }
 
                         // write results history to csv
-                        if let Some(writer) = &results_history_writer {
+                        if let Some(writer) = &writers.results_history_writer {
                             match utils::get_timestamp_as_millis_as_string() {
                                 Ok(timestamp) => {
                                     let csv_string = all_results_gaurd.current_aggrigated_results_with_timestamp_csv_string(&timestamp);
                                     match csv_string {
                                         Ok(csv_string) => {
-                                            if let Err(e) = writer.append_all(csv_string.as_bytes()).await {
-                                                tracing::error!("Error writing to csv: {}", e);
+                                            if let Err(error) = writer.append_all(csv_string.as_bytes()).await {
+                                                tracing::error!(%error, "Error writing to csv");
                                             }
                                         }
-                                        Err(e) => {
-                                            tracing::error!("Error getting csv string: {}", e);
+                                        Err(error) => {
+                                            tracing::error!(%error, "Error getting csv string");
                                         }
                                     }
                                 }
-                                Err(e) => {
-                                    tracing::error!("Error getting timestamp: {}", e);
+                                Err(error) => {
+                                    tracing::error!(%error, "Error getting timestamp");
                                 }
                             }
                         }
 
-                        if let Some(writer) = &prometheus_current_metrics_writer {
+                        if let Some(writer) = &writers.prometheus_current_metrics_writer {
                             let prometheus_metrics_string = prometheus_exporter_arc.get_metrics();
                             match prometheus_metrics_string {
                                 Ok(prometheus_metrics_string) => {
-                                    if let Err(e) =  writer.write_all(prometheus_metrics_string.as_bytes()).await {
-                                        tracing::error!("Error writing prometheus current metrics: {}", e);
+                                    if let Err(error) =  writer.write_all(prometheus_metrics_string.as_bytes()).await {
+                                        tracing::error!(%error, "Error writing prometheus current metrics");
                                     }
                                 }
-                                Err(e) => {
-                                    tracing::error!("Error getting prometheus string: {}", e);
+                                Err(error) => {
+                                    tracing::error!(%error, "Error getting prometheus string");
                                 }
                             }
                         }
 
-                        if let Some(writer) = &prometheus_metrics_history_writer {
+                        if let Some(writer) = &writers.prometheus_metrics_history_writer {
                             let prometheus_metrics_string = prometheus_exporter_arc.get_metrics();
                             match prometheus_metrics_string {
                                 Ok(prometheus_metrics_string) => {
-                                    if let Err(e) = writer.write_all(prometheus_metrics_string.as_bytes()).await {
-                                        tracing::error!("Error writing prometheus metrics history: {}", e);
+                                    if let Err(error) = writer.write_all(prometheus_metrics_string.as_bytes()).await {
+                                        tracing::error!(%error, "Error writing prometheus metrics history");
                                     }
                                 }
-                                Err(e) => {
-                                    tracing::error!("Error getting prometheus string: {}", e);
+                                Err(error) => {
+                                    tracing::error!(%error, "Error getting prometheus string");
                                 }
                             }
                         }
@@ -467,6 +465,12 @@ impl Test {
                 }
 
                 MainMessage::UserSpawned(user_spawned_msg) => {
+                    tracing::trace!(
+                        user_name = &user_spawned_msg.user_info.name,
+                        user_id = &user_spawned_msg.user_info.id,
+                        "User spawned"
+                    );
+
                     let mut total_users_spawned_gaurd =
                         self.total_users_spawned_arc_rwlock.write().await;
                     *total_users_spawned_gaurd += 1;
@@ -476,13 +480,20 @@ impl Test {
                         user_spawned_msg.user_info.name,
                     );
 
-                    self.prometheus_exporter_arc.add_user(UserLabel {
+                    self.prometheus_exporter_arc.add_user(UserCountLabel {
                         user_name: user_spawned_msg.user_info.name,
                     });
                 }
 
                 // tasks with suicide or panic are not included
                 MainMessage::TaskExecuted(user_fired_task_msg) => {
+                    tracing::trace!(
+                        user_name = &user_fired_task_msg.user_info.name,
+                        user_id = &user_fired_task_msg.user_info.id,
+                        task_name = &user_fired_task_msg.task_info.name,
+                        "User excuted a task"
+                    );
+
                     self.user_stats_collection
                         .increment_total_tasks(&user_fired_task_msg.user_info.id);
 
@@ -495,9 +506,9 @@ impl Test {
 
                 MainMessage::UserSelfStopped(user_self_stopped_msg) => {
                     tracing::info!(
-                        "User [{}][{}] attempted suicide",
-                        &user_self_stopped_msg.user_info.name,
-                        &user_self_stopped_msg.user_info.id
+                        user_name = &user_self_stopped_msg.user_info.name,
+                        user_id = &user_self_stopped_msg.user_info.id,
+                        "User attempted suicide",
                     );
 
                     self.user_stats_collection.set_user_status(
@@ -505,11 +516,14 @@ impl Test {
                         UserStatus::Cancelled,
                     );
 
-                    self.prometheus_exporter_arc.remove_user(UserLabel {
+                    self.prometheus_exporter_arc.remove_user(UserCountLabel {
                         user_name: user_self_stopped_msg.user_info.name,
                     });
 
-                    // TODO: self.prometheus_exporter_arc.add_suicide
+                    self.prometheus_exporter_arc.add_suicide(UserLabel {
+                        user_id: user_self_stopped_msg.user_info.id,
+                        user_name: user_self_stopped_msg.user_info.name,
+                    });
                 }
 
                 MainMessage::UserFinished(user_finished_msg) => {
@@ -519,19 +533,19 @@ impl Test {
 
                 MainMessage::UserPanicked(user_panicked_msg) => {
                     tracing::warn!(
-                        "User [{}][{}] panicked!",
-                        &user_panicked_msg.user_info.name,
-                        &user_panicked_msg.user_info.id
+                        user_name = &user_panicked_msg.user_info.name,
+                        user_id = &user_panicked_msg.user_info.id,
+                        "User panicked!"
                     );
 
                     self.user_stats_collection
                         .set_user_status(&user_panicked_msg.user_info.id, UserStatus::Panicked);
 
-                    self.prometheus_exporter_arc.remove_user(UserLabel {
+                    self.prometheus_exporter_arc.remove_user(UserCountLabel {
                         user_name: user_panicked_msg.user_info.name,
                     });
 
-                    self.prometheus_exporter_arc.add_panic(PanicLabel {
+                    self.prometheus_exporter_arc.add_panic(UserLabel {
                         user_id: user_panicked_msg.user_info.id,
                         user_name: user_panicked_msg.user_info.name,
                     });
@@ -539,9 +553,9 @@ impl Test {
 
                 MainMessage::UserUnknownStatus(user_unknown_status_msg) => {
                     tracing::warn!(
-                        "User [{}][{}] has unknown status!. Supervisor failed to get user status",
-                        &user_unknown_status_msg.user_info.name,
-                        &user_unknown_status_msg.user_info.id
+                        user_name = &user_unknown_status_msg.user_info.name,
+                        user_id = &user_unknown_status_msg.user_info.id,
+                        "User has unknown status!. Supervisor failed to get user status",
                     );
 
                     self.user_stats_collection.set_user_status(
@@ -549,7 +563,7 @@ impl Test {
                         UserStatus::Unknown,
                     );
 
-                    self.prometheus_exporter_arc.remove_user(UserLabel {
+                    self.prometheus_exporter_arc.remove_user(UserCountLabel {
                         user_name: user_unknown_status_msg.user_info.name,
                     });
                 }
@@ -582,7 +596,7 @@ impl Test {
 
         // start the reciever
         self.block_on_reciever(results_rx).await;
-        tracing::debug!("Reciever dropped");
+        tracing::debug!("Main reciever dropped");
 
         // this will cancel the timer and background tasks if the only given user has no tasks so it will finish immediately thus causing the reciever to drop
         self.token.cancel();
@@ -592,36 +606,51 @@ impl Test {
             match spawn_users_handles.await {
                 Ok(supervisors) => {
                     for (supervisor, id) in supervisors {
-                        if let Err(e) = supervisor.await {
+                        if let Err(error) = supervisor.await {
                             self.user_stats_collection
                                 .set_user_status(&id, UserStatus::Unknown);
-                            tracing::error!("Error joining supervisor for user [{}]: {}", id, e);
+                            tracing::error!(%error, user_id=id, "Error joining supervisor for user");
                         };
                     }
                 }
-                Err(e) => {
-                    tracing::error!("Error joining supervisors: {}", e);
+                Err(error) => {
+                    tracing::error!(%error, "Error joining supervisors");
                 }
             }
         }
-        if let Err(e) = server_handle.await {
-            tracing::error!("Error joining server: {}", e);
-        }
-        tracing::debug!("Server finished");
 
-        if let Err(e) = background_tasks_handle.await {
-            tracing::error!("Error joining background tasks: {}", e);
+        match server_handle.await {
+            Ok(_) => {
+                tracing::debug!("Server joined");
+            }
+            Err(error) => {
+                tracing::error!(%error, "Error joining server");
+            }
         }
-        tracing::debug!("Background tasks finished");
 
-        if let Err(e) = timer_handle.await {
-            tracing::error!("Error joining timer: {}", e);
+        match background_tasks_handle.await {
+            Ok(_) => {
+                tracing::debug!("Background tasks joined");
+            }
+            Err(error) => {
+                tracing::error!(%error, "Error joining background tasks");
+            }
         }
-        tracing::debug!("Timer finished");
+
+        match timer_handle.await {
+            Ok(_) => {
+                tracing::debug!("Timer joined");
+            }
+            Err(error) => {
+                tracing::error!(%error, "Error joining timer");
+            }
+        }
 
         self.write_summary_to_file().await;
+        // TODO: update results and wrtie to file and to std if needed
+        // TODO: write to prometheus
 
-        tracing::info!("Test finished");
+        tracing::info!("Test terminated");
     }
 
     async fn write_summary_to_file(&mut self) {
@@ -642,12 +671,12 @@ impl Test {
             };
             match summary_string {
                 Ok(summary_string) => {
-                    if let Err(e) = summary_writer.write_all(summary_string.as_bytes()).await {
-                        tracing::error!("Error writing summary to file: {}", e);
+                    if let Err(error) = summary_writer.write_all(summary_string.as_bytes()).await {
+                        tracing::error!(%error, "Error writing summary to file");
                     }
                 }
-                Err(e) => {
-                    tracing::error!("Error serializing summary: {}", e);
+                Err(error) => {
+                    tracing::error!(%error, "Error serializing summar");
                 }
             }
         }
@@ -663,59 +692,57 @@ impl Drop for Test {
 
 impl Writers {
     pub async fn new(test_config: &TestConfig) -> Self {
-        let current_results_writer = if let Some(current_results_file) =
-            &test_config.current_results_file
-        {
-            match Writer::from_str(current_results_file).await {
-                Ok(writer) => Some(writer),
-                Err(e) => {
-                    tracing::error!("Failed to create writer for current results file: [{}]", e);
-                    None
+        let current_results_writer =
+            if let Some(current_results_file) = &test_config.current_results_file {
+                match Writer::from_str(current_results_file).await {
+                    Ok(writer) => Some(writer),
+                    Err(error) => {
+                        tracing::error!(%error, "Failed to create writer for current results file");
+                        None
+                    }
                 }
-            }
-        } else {
-            None
-        };
-        let results_history_writer = if let Some(results_history_file) =
-            &test_config.results_history_file
-        {
-            match Writer::from_str(results_history_file).await {
-                Ok(writer) => {
-                    // write header
-                    let header = AllResults::history_header_csv_string();
-                    match header {
-                        Ok(header) => match writer.write_all(header.as_bytes()).await {
-                            Ok(_) => Some(writer),
-                            Err(e) => {
+            } else {
+                None
+            };
+        let results_history_writer =
+            if let Some(results_history_file) = &test_config.results_history_file {
+                match Writer::from_str(results_history_file).await {
+                    Ok(writer) => {
+                        // write header
+                        let header = AllResults::history_header_csv_string();
+                        match header {
+                            Ok(header) => match writer.write_all(header.as_bytes()).await {
+                                Ok(_) => Some(writer),
+                                Err(error) => {
+                                    tracing::error!(
+                                        %error,
+                                        "Failed to write header to results history file"
+                                    );
+                                    None
+                                }
+                            },
+                            Err(error) => {
                                 tracing::error!(
-                                    "Failed to write header to results history file: [{}]",
-                                    e
+                                    %error,
+                                    "Failed to create header for results history file",
                                 );
                                 None
                             }
-                        },
-                        Err(e) => {
-                            tracing::error!(
-                                "Failed to create header for results history file: [{}]",
-                                e
-                            );
-                            None
                         }
                     }
+                    Err(error) => {
+                        tracing::error!(%error, "Failed to create writer for results history file");
+                        None
+                    }
                 }
-                Err(e) => {
-                    tracing::error!("Failed to create writer for results history file: [{}]", e);
-                    None
-                }
-            }
-        } else {
-            None
-        };
+            } else {
+                None
+            };
         let summary_writer = if let Some(summary_file) = &test_config.summary_file {
             match Writer::from_str(summary_file).await {
                 Ok(writer) => Some(writer),
-                Err(e) => {
-                    tracing::error!("Failed to create writer for summary file: [{}]", e);
+                Err(error) => {
+                    tracing::error!(%error, "Failed to create writer for summary file");
                     None
                 }
             }
@@ -727,10 +754,10 @@ impl Writers {
         {
             match Writer::from_str(prometheus_current_metrics_file).await {
                 Ok(writer) => Some(writer),
-                Err(e) => {
+                Err(error) => {
                     tracing::error!(
-                        "Failed to create writer for prometheus current metrics file: [{}]",
-                        e
+                        %error,
+                        "Failed to create writer for prometheus current metrics file"
                     );
                     None
                 }
@@ -748,10 +775,10 @@ impl Writers {
             .await
             {
                 Ok(writer) => Some(writer),
-                Err(e) => {
+                Err(error) => {
                     tracing::error!(
-                        "Failed to create writer for prometheus history metrics: [{}]",
-                        e
+                        %error,
+                        "Failed to create writer for prometheus history metrics"
                     );
                     None
                 }
