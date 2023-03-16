@@ -61,7 +61,6 @@ Obviously, you can use PromQL to get much more comlex results. For more informat
 - [X] TestConfig from CLI
 - [X] TestConfig from file: YAML, JSON
 - [X] User summary
-- [ ] Stop condition parser to create a stop condition from a string
 - [ ] Documentation
 - [ ] Examples
 - [ ] Tests
