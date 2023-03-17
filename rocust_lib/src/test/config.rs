@@ -6,6 +6,7 @@ use serde_yaml::{self, Error as SerdeYamlError};
 use std::net::{AddrParseError, SocketAddr};
 use thiserror::Error as ThisError;
 
+//TODO: add precision of the float for the table
 #[derive(Clone)]
 pub struct TestConfig {
     pub user_count: u64,
