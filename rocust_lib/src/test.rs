@@ -15,7 +15,7 @@ use crate::{
     utils,
 };
 use rand::Rng;
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{path::Path, str::FromStr, sync::Arc, time::Duration};
 use tokio::{
     io::{self, AsyncWriteExt},
     sync::{mpsc, RwLock},
@@ -76,6 +76,26 @@ impl Test {
 
     fn calculate_elapsed_time(start_timestamp: &Instant) -> Duration {
         Instant::now().duration_since(*start_timestamp)
+    }
+
+    fn update_stats_on_update_interval(elapsed_time: &Duration, all_results: &mut AllResults) {
+        all_results.calculate_on_update_interval(elapsed_time);
+    }
+
+    async fn print_stats_to_stdout(print_to_stdout: bool, all_results: &AllResults) {
+        if print_to_stdout {
+            let table_string = all_results.table_string();
+            let mut stdout = io::stdout();
+            let _ = stdout.write_all(table_string.as_bytes()).await;
+        }
+    }
+
+    fn get_supported_summary_extension(path: &Path) -> SupportedExtension {
+        let extension =
+            SupportedExtension::from_str(utils::get_extension_from_filename(path).unwrap_or(""))
+                .unwrap_or(SupportedExtension::Json);
+
+        extension
     }
 
     async fn sleep_between(between: (u64, u64)) {
@@ -314,81 +334,13 @@ impl Test {
 
                         let mut all_results_gaurd = all_results_arc_rwlock.write().await;
 
-                        // update stats
                         let elapsed_time = Test::calculate_elapsed_time(&*start_timestamp_arc_rwlock.read().await);
-                        all_results_gaurd.calculate_on_update_interval(&elapsed_time);
 
-                        // print stats
-                        if test_config.print_to_stdout {
-                            let table_string = all_results_gaurd.table_string();
-                            let mut stdout = io::stdout();
-                            let _ = stdout.write_all(table_string.as_bytes()).await;
-                        }
+                        Test::update_stats_on_update_interval(&elapsed_time, &mut *all_results_gaurd);
 
-                        // write current results to csv
-                        if let Some(writer) = &writers.current_results_writer {
-                            let csv_string = all_results_gaurd.current_results_csv_string();
-                            match csv_string {
-                                Ok(csv_string) => {
-                                    if let Err(error) = writer.write_all(csv_string.as_bytes()).await {
-                                        tracing::error!(%error, "Error writing to csv");
-                                    }
-                                }
-                                Err(error) => {
-                                    tracing::error!(%error, "Error getting csv string");
-                                }
-                            }
-                        }
+                        Test::print_stats_to_stdout(test_config.print_to_stdout, &*all_results_gaurd).await;
 
-                        // write results history to csv
-                        if let Some(writer) = &writers.results_history_writer {
-                            match utils::get_timestamp_as_millis_as_string() {
-                                Ok(timestamp) => {
-                                    let csv_string = all_results_gaurd.current_aggrigated_results_with_timestamp_csv_string(&timestamp);
-                                    match csv_string {
-                                        Ok(csv_string) => {
-                                            if let Err(error) = writer.append_all(csv_string.as_bytes()).await {
-                                                tracing::error!(%error, "Error writing to csv");
-                                            }
-                                        }
-                                        Err(error) => {
-                                            tracing::error!(%error, "Error getting csv string");
-                                        }
-                                    }
-                                }
-                                Err(error) => {
-                                    tracing::error!(%error, "Error getting timestamp");
-                                }
-                            }
-                        }
-
-                        if let Some(writer) = &writers.prometheus_current_metrics_writer {
-                            let prometheus_metrics_string = prometheus_exporter_arc.get_metrics();
-                            match prometheus_metrics_string {
-                                Ok(prometheus_metrics_string) => {
-                                    if let Err(error) =  writer.write_all(prometheus_metrics_string.as_bytes()).await {
-                                        tracing::error!(%error, "Error writing prometheus current metrics");
-                                    }
-                                }
-                                Err(error) => {
-                                    tracing::error!(%error, "Error getting prometheus string");
-                                }
-                            }
-                        }
-
-                        if let Some(writer) = &writers.prometheus_metrics_history_writer {
-                            let prometheus_metrics_string = prometheus_exporter_arc.get_metrics();
-                            match prometheus_metrics_string {
-                                Ok(prometheus_metrics_string) => {
-                                    if let Err(error) = writer.write_all(prometheus_metrics_string.as_bytes()).await {
-                                        tracing::error!(%error, "Error writing prometheus metrics history");
-                                    }
-                                }
-                                Err(error) => {
-                                    tracing::error!(%error, "Error getting prometheus string");
-                                }
-                            }
-                        }
+                        writers.write_on_update_interval(&*all_results_gaurd, &*prometheus_exporter_arc).await;
                     }
                 }
             }
@@ -645,30 +597,47 @@ impl Test {
                 tracing::error!(%error, "Error joining timer");
             }
         }
+        let elapsed_time =
+            Test::calculate_elapsed_time(&*self.start_timestamp_arc_rwlock.read().await);
 
-        self.write_summary_to_file().await;
-        // TODO: update results and wrtie to file and to std if needed
-        // TODO: write to prometheus
+        self.update_summary_and_write_to_file(&elapsed_time).await;
+
+        let mut all_results_gaurd = self.all_results_arc_rwlock.write().await;
+
+        Test::update_stats_on_update_interval(&elapsed_time, &mut *all_results_gaurd);
+
+        self.writers
+            .write_on_update_interval(&*all_results_gaurd, &*self.prometheus_exporter_arc)
+            .await;
 
         tracing::info!("Test terminated");
     }
 
-    async fn write_summary_to_file(&mut self) {
+    fn get_summary_string_from_extension(
+        &self,
+        extension: SupportedExtension,
+    ) -> Result<String, user::UserStatsCollectionError> {
+        match extension {
+            SupportedExtension::Yaml => self.user_stats_collection.yaml_string(),
+            SupportedExtension::Json => self.user_stats_collection.json_string(),
+        }
+    }
+
+    fn get_summary_string_from_path(
+        &self,
+        path: &Path,
+    ) -> Result<String, user::UserStatsCollectionError> {
+        let extension = Test::get_supported_summary_extension(path);
+        self.get_summary_string_from_extension(extension)
+    }
+
+    async fn update_summary_and_write_to_file(&mut self, elapsed_time: &Duration) {
         if let Some(summary_writer) = &self.writers.summary_writer {
-            tracing::info!("Writing summary to file");
-            let elapsed_time =
-                Test::calculate_elapsed_time(&*self.start_timestamp_arc_rwlock.read().await);
             self.user_stats_collection
                 .calculate_on_update_interval(&elapsed_time);
 
-            let extension = SupportedExtension::from_str(
-                utils::get_extension_from_filename(summary_writer.get_path()).unwrap_or(""),
-            )
-            .unwrap_or(SupportedExtension::Json);
-            let summary_string = match extension {
-                SupportedExtension::Yaml => self.user_stats_collection.yaml_string(),
-                SupportedExtension::Json => self.user_stats_collection.json_string(),
-            };
+            let summary_string = self.get_summary_string_from_path(summary_writer.get_path());
+
             match summary_string {
                 Ok(summary_string) => {
                     if let Err(error) = summary_writer.write_all(summary_string.as_bytes()).await {
@@ -793,5 +762,92 @@ impl Writers {
             prometheus_current_metrics_writer,
             prometheus_metrics_history_writer,
         }
+    }
+
+    async fn write_current_results(&self, all_results: &AllResults) {
+        if let Some(writer) = &self.current_results_writer {
+            let csv_string = all_results.current_results_csv_string();
+            match csv_string {
+                Ok(csv_string) => {
+                    if let Err(error) = writer.write_all(csv_string.as_bytes()).await {
+                        tracing::error!(%error, "Error writing to csv");
+                    }
+                }
+                Err(error) => {
+                    tracing::error!(%error, "Error getting csv string");
+                }
+            }
+        }
+    }
+
+    async fn write_results_history(&self, all_results: &AllResults) {
+        if let Some(writer) = &self.results_history_writer {
+            match utils::get_timestamp_as_millis_as_string() {
+                Ok(timestamp) => {
+                    let csv_string = all_results
+                        .current_aggrigated_results_with_timestamp_csv_string(&timestamp);
+                    match csv_string {
+                        Ok(csv_string) => {
+                            if let Err(error) = writer.append_all(csv_string.as_bytes()).await {
+                                tracing::error!(%error, "Error writing to csv");
+                            }
+                        }
+                        Err(error) => {
+                            tracing::error!(%error, "Error getting csv string");
+                        }
+                    }
+                }
+                Err(error) => {
+                    tracing::error!(%error, "Error getting timestamp");
+                }
+            }
+        }
+    }
+
+    async fn write_prometheus_current_metrics(&self, prometheus_exporter: &PrometheusExporter) {
+        if let Some(writer) = &self.prometheus_current_metrics_writer {
+            let prometheus_metrics_string = prometheus_exporter.get_metrics();
+            match prometheus_metrics_string {
+                Ok(prometheus_metrics_string) => {
+                    if let Err(error) = writer.write_all(prometheus_metrics_string.as_bytes()).await
+                    {
+                        tracing::error!(%error, "Error writing prometheus current metrics");
+                    }
+                }
+                Err(error) => {
+                    tracing::error!(%error, "Error getting prometheus string");
+                }
+            }
+        }
+    }
+
+    async fn write_prometheus_metrics_history(&self, prometheus_exporter: &PrometheusExporter) {
+        if let Some(writer) = &self.prometheus_metrics_history_writer {
+            let prometheus_metrics_string = prometheus_exporter.get_metrics();
+            match prometheus_metrics_string {
+                Ok(prometheus_metrics_string) => {
+                    if let Err(error) = writer.write_all(prometheus_metrics_string.as_bytes()).await
+                    {
+                        tracing::error!(%error, "Error writing prometheus metrics history");
+                    }
+                }
+                Err(error) => {
+                    tracing::error!(%error, "Error getting prometheus string");
+                }
+            }
+        }
+    }
+
+    async fn write_on_update_interval(
+        &self,
+        all_results: &AllResults,
+        prometheus_exporter: &PrometheusExporter,
+    ) {
+        self.write_current_results(all_results).await;
+        self.write_results_history(all_results).await;
+        self.write_prometheus_current_metrics(prometheus_exporter)
+            .await;
+        self.write_prometheus_metrics_history(prometheus_exporter)
+            .await;
     }
 }
