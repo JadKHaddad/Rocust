@@ -73,8 +73,8 @@ impl Results {
 
     fn calculate_average_response_time(&mut self) {
         // (total_requests - total_failed_requests) = total_successful_requests
-        self.average_response_time =
-            self.total_response_time / (self.total_requests - self.total_failed_requests) as f64;
+        let total_successful_requests = self.total_requests - self.total_failed_requests;
+        self.average_response_time = self.total_response_time / total_successful_requests as f64;
     }
     fn calculate_requests_per_second(&mut self, elapsed: &Duration) {
         let total_requests = self.total_requests;
@@ -320,7 +320,7 @@ impl AllResults {
         Ok(data)
     }
 
-    pub(crate) fn table_string(&self) -> String {
+    pub(crate) fn table_string(&self, precision: usize) -> String {
         let mut table = Table::new();
         table.add_row(Row::new(
             CONSOLE_HEADERS.iter().map(|s| Cell::new(s)).collect(),
@@ -329,29 +329,50 @@ impl AllResults {
             table.add_row(row![
                 endpoint_type_name.r#type,
                 endpoint_type_name.name,
-                results.total_requests,
-                results.total_failed_requests,
-                results.total_errors,
-                results.requests_per_second,
-                results.failed_requests_per_second,
-                results.total_response_time,
-                results.average_response_time,
-                results.min_response_time,
-                results.max_response_time,
+                format!("{:.1$}", results.total_requests, precision),
+                format!("{:.1$}", results.total_failed_requests, precision),
+                format!("{:.1$}", results.total_errors, precision),
+                format!("{:.1$}", results.requests_per_second, precision),
+                format!("{:.1$}", results.failed_requests_per_second, precision),
+                format!("{:.1$}", results.total_response_time, precision),
+                format!("{:.1$}", results.average_response_time, precision),
+                format!("{:.1$}", results.min_response_time, precision),
+                format!("{:.1$}", results.max_response_time, precision),
             ]);
         }
         table.add_row(row![
             CONSOLE_AGR_TYPE_NAME[0],
             CONSOLE_AGR_TYPE_NAME[1],
-            self.aggrigated_results.total_requests,
-            self.aggrigated_results.total_failed_requests,
-            self.aggrigated_results.total_errors,
-            self.aggrigated_results.requests_per_second,
-            self.aggrigated_results.failed_requests_per_second,
-            self.aggrigated_results.total_response_time,
-            self.aggrigated_results.average_response_time,
-            self.aggrigated_results.min_response_time,
-            self.aggrigated_results.max_response_time,
+            format!("{:.1$}", self.aggrigated_results.total_requests, precision),
+            format!(
+                "{:.1$}",
+                self.aggrigated_results.total_failed_requests, precision
+            ),
+            format!("{:.1$}", self.aggrigated_results.total_errors, precision),
+            format!(
+                "{:.1$}",
+                self.aggrigated_results.requests_per_second, precision
+            ),
+            format!(
+                "{:.1$}",
+                self.aggrigated_results.failed_requests_per_second, precision
+            ),
+            format!(
+                "{:.1$}",
+                self.aggrigated_results.total_response_time, precision
+            ),
+            format!(
+                "{:.1$}",
+                self.aggrigated_results.average_response_time, precision
+            ),
+            format!(
+                "{:.1$}",
+                self.aggrigated_results.min_response_time, precision
+            ),
+            format!(
+                "{:.1$}",
+                self.aggrigated_results.max_response_time, precision
+            ),
         ]);
         table.to_string()
     }

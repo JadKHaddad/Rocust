@@ -84,7 +84,7 @@ impl Test {
 
     async fn print_stats_to_stdout(print_to_stdout: bool, all_results: &AllResults) {
         if print_to_stdout {
-            let table_string = all_results.table_string();
+            let table_string = all_results.table_string(3);
             let mut stdout = io::stdout();
             let _ = stdout.write_all(table_string.as_bytes()).await;
         }
