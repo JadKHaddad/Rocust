@@ -1,0 +1,34 @@
+{
+    "configurations": [
+        {
+            "type": "cargo",
+            "name": "Run Dev",
+            "cargoArgs": ["run", "-p", "dev"],
+        },
+        {
+            "type": "cargo",
+            "name": "Run Dev Release",
+            "cargoArgs": ["run", "--release", "-p", "dev"],
+        },
+        {
+            "type": "cargo",
+            "name": "Build Dev",
+            "cargoArgs": ["build", "-p", "dev"],
+        },
+        {
+            "type": "cargo",
+            "name": "Build Dev Release",
+            "cargoArgs": ["build", "--release", "-p", "dev"],
+        },
+        {
+            "type": "cargo",
+            "name": "Build",
+            "cargoArgs": ["build"],
+        },
+        {
+            "type": "cargo",
+            "name": "Clean",
+            "cargoArgs": ["clean"],
+        },
+    ]
+}
