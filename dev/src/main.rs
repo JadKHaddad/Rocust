@@ -1,7 +1,10 @@
 use async_trait::async_trait;
 use reqwest::Client;
 use rocust::{
-    rocust_lib::{futures::TimedExt, run, Context, Shared, Test, TestConfig, User},
+    rocust_lib::{
+        futures::{CountedExt, TimedExt},
+        run, Context, Shared, Test, TestConfig, User,
+    },
     rocust_macros::has_task,
 };
 use std::{net::SocketAddr, sync::Arc};
@@ -179,12 +182,17 @@ struct FacebookUser {
 impl FacebookUser {
     #[task(priority = 10)]
     pub async fn index(&mut self, context: &Context) {
-        let (res, elapsed) = self
+        let ((res, elapsed), polls) = self
             .client
             .get(String::from("https://facebook.com"))
             .send()
             .timed()
+            .counted()
             .await;
+        println!(
+            "FacebookUser performed {} polls to fetch [https://facebook.com]",
+            polls
+        );
         match res {
             Ok(res) => {
                 if res.status().is_success() {
