@@ -6,7 +6,6 @@ use serde_yaml::{self, Error as SerdeYamlError};
 use std::net::{AddrParseError, SocketAddr};
 use thiserror::Error as ThisError;
 
-//TODO: add precision of the float for the table
 #[derive(Clone)]
 pub struct TestConfig {
     pub user_count: u64,
@@ -14,6 +13,7 @@ pub struct TestConfig {
     pub runtime: Option<u64>,
     pub update_interval_in_secs: u64,
     pub print_to_stdout: bool,
+    pub precision: usize,
     pub current_results_file: Option<String>,
     pub results_history_file: Option<String>,
     pub summary_file: Option<String>,
@@ -31,6 +31,7 @@ impl Default for TestConfig {
             runtime: None,
             update_interval_in_secs: 1,
             print_to_stdout: true,
+            precision: 3,
             current_results_file: None,
             results_history_file: None,
             summary_file: None,
@@ -72,6 +73,10 @@ impl TestConfig {
             print_to_stdout,
             ..self
         }
+    }
+
+    pub fn precision(self, precision: usize) -> Self {
+        Self { precision, ..self }
     }
 
     pub fn current_results_file(self, current_results_file: String) -> Self {
@@ -201,6 +206,7 @@ impl TryFrom<ExternalTestConfig> for TestConfig {
             runtime: external_test_config.runtime,
             update_interval_in_secs: external_test_config.update_interval_in_secs,
             print_to_stdout: !external_test_config.no_print_to_stdout,
+            precision: external_test_config.precision,
             current_results_file: external_test_config.current_results_file,
             results_history_file: external_test_config.results_history_file,
             summary_file: external_test_config.summary_file,
@@ -263,6 +269,10 @@ struct ExternalTestConfig {
     /// Do not print results to stdout.
     #[arg(long)]
     no_print_to_stdout: bool,
+
+    /// Precision of the printed results.
+    #[arg(long, default_value_t = 3)]
+    precision: usize,
 
     /// Do not log to stdout.
     #[arg(long)]

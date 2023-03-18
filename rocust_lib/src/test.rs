@@ -82,9 +82,13 @@ impl Test {
         all_results.calculate_on_update_interval(elapsed_time);
     }
 
-    async fn print_stats_to_stdout(print_to_stdout: bool, all_results: &AllResults) {
+    async fn print_stats_to_stdout(
+        precision: usize,
+        print_to_stdout: bool,
+        all_results: &AllResults,
+    ) {
         if print_to_stdout {
-            let table_string = all_results.table_string(3);
+            let table_string = all_results.table_string(precision);
             let mut stdout = io::stdout();
             let _ = stdout.write_all(table_string.as_bytes()).await;
         }
@@ -338,7 +342,7 @@ impl Test {
 
                         Test::update_stats_on_update_interval(&elapsed_time, &mut *all_results_gaurd);
 
-                        Test::print_stats_to_stdout(test_config.print_to_stdout, &*all_results_gaurd).await;
+                        Test::print_stats_to_stdout(test_config.precision, test_config.print_to_stdout, &*all_results_gaurd).await;
 
                         writers.write_on_update_interval(&*all_results_gaurd, &*prometheus_exporter_arc).await;
                     }
