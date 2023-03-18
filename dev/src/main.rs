@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use reqwest::Client;
 use rocust::{
     rocust_lib::{
-        futures::{CountedExt, TimedExt},
+        futures::RocustFutures,
         run, Context, Shared, Test, TestConfig, User,
     },
     rocust_macros::has_task,
@@ -73,7 +73,13 @@ impl GoogleUser {
             .get(format!("https://{}", self.host))
             .send()
             .timed()
+            .delayed(std::time::Duration::from_secs(1))
             .await;
+
+        println!(
+            "GoogleUser fetched [https://{}] with delay of 1 second",
+            self.host
+        );
 
         match res {
             Ok(res) => {
