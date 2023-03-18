@@ -1,10 +1,7 @@
 use async_trait::async_trait;
 use reqwest::Client;
 use rocust::{
-    rocust_lib::{
-        futures::RocustFutures,
-        run, Context, Shared, Test, TestConfig, User,
-    },
+    rocust_lib::{futures::RocustFutures, run, Context, Shared, Test, TestConfig, User},
     rocust_macros::has_task,
 };
 use std::{net::SocketAddr, sync::Arc};
@@ -37,11 +34,19 @@ impl GoogleUser {
     pub async fn blocking_index(&mut self, context: &Context) {
         println!("GoogleUser [{}] performing blocking", self.id);
         let host = self.host;
-        let res = tokio::task::spawn_blocking(move || {
+
+        //spawn blocking, recommended
+        // let res = tokio::task::spawn_blocking(move || {
+        //     reqwest::blocking::get(format!("https://{}", host))
+        // })
+        // .await
+        // .unwrap();
+
+        //or block in place
+        let res = tokio::task::block_in_place(move || {
             reqwest::blocking::get(format!("https://{}", host))
-        })
-        .await
-        .unwrap();
+        });
+
         match res {
             Ok(res) => {
                 if res.status().is_success() {
