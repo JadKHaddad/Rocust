@@ -1,5 +1,6 @@
 pub mod config;
 pub(crate) mod controller;
+pub mod spawn_coordinator;
 pub mod user;
 
 use crate::{

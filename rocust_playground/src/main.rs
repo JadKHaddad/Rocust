@@ -1,5 +1,9 @@
 use async_trait::async_trait;
-use rocust::rocust_lib::{traits::HasTask, Context, TestConfig, User};
+use rocust::rocust_lib::{
+    test::spawn_coordinator::{SpawnCoordinator, UserSpawnController},
+    traits::HasTask,
+    Context, TestConfig, User,
+};
 
 #[allow(dead_code)]
 
@@ -63,24 +67,55 @@ impl User for MyUser {
 
 #[tokio::main]
 async fn main() {
-    let mut blocking_tasks = vec![];
-    fn blocking(
-        u: MyUser,
-        context: rocust::rocust_lib::test::user::context::Context,
-    ) -> ::core::pin::Pin<
-        Box<
-            dyn ::core::future::Future<
-                    Output = Result<
-                        (MyUser, rocust::rocust_lib::test::user::context::Context),
-                        tokio::task::JoinError,
-                    >,
-                > + ::core::marker::Send,
-        >,
-    > {
-        Box::pin(async move { tokio::task::spawn_blocking(move || u.blocking(context)).await })
-    }
+    // let mut blocking_tasks = vec![];
+    // fn blocking(
+    //     u: MyUser,
+    //     context: rocust::rocust_lib::test::user::context::Context,
+    // ) -> ::core::pin::Pin<
+    //     Box<
+    //         dyn ::core::future::Future<
+    //                 Output = Result<
+    //                     (MyUser, rocust::rocust_lib::test::user::context::Context),
+    //                     tokio::task::JoinError,
+    //                 >,
+    //             > + ::core::marker::Send,
+    //     >,
+    // > {
+    //     Box::pin(async move { tokio::task::spawn_blocking(move || u.blocking(context)).await })
+    // }
 
-    blocking_tasks.push(rocust::rocust_lib::tasks::BlockingTask::new(
-        1, "blocking", blocking,
-    ));
+    // blocking_tasks.push(rocust::rocust_lib::tasks::BlockingTask::new(
+    //     1, "blocking", blocking,
+    // ));
+
+    if std::env::var_os("RUST_LOG").is_none() {
+        std::env::set_var("RUST_LOG", "rocust=trace");
+    }
+    tracing_subscriber::fmt::init();
+
+    let f_controller = UserSpawnController {
+        user_name: String::from("FacebookUser"),
+        count: 33,
+        total_spawned: 0,
+    };
+
+    let g_controller = UserSpawnController {
+        user_name: String::from("GoogleUser"),
+        count: 20,
+        total_spawned: 0,
+    };
+
+    let k_controller = UserSpawnController {
+        user_name: String::from("KontentUser"),
+        count: 10,
+        total_spawned: 0,
+    };
+
+    let controllers = vec![f_controller, g_controller, k_controller];
+    let mut coordinator = SpawnCoordinator {
+        users_per_sec: 10,
+        user_spawn_controllers: controllers,
+    };
+
+    coordinator.spawn().await;
 }
