@@ -113,7 +113,7 @@ async fn main() {
 
     let controllers = vec![f_controller, g_controller, k_controller];
     let mut coordinator = SpawnCoordinator {
-        users_per_sec: 10,
+        users_per_sec: 50,
         user_spawn_controllers: controllers,
     };
 
