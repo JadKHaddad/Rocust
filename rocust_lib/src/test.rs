@@ -4,15 +4,12 @@ pub mod spawn_coordinator;
 pub mod user;
 
 use crate::{
-    events::EventsHandler,
     fs::{timestamped_writer::TimeStapmedWriter, writer::Writer},
     messages::{MainMessage, ResultMessage},
     prometheus_exporter::{PrometheusExporter, RequestLabel, TaskLabel, UserCountLabel, UserLabel},
     results::AllResults,
     server::Server,
-    tasks::EventsTaskInfo,
     test::config::SupportedExtension,
-    traits::{HasTask, PrioritisedRandom, Shared, User},
     utils,
 };
 use rand::Rng;
@@ -28,7 +25,8 @@ use tokio_util::sync::CancellationToken;
 use self::{
     config::TestConfig,
     controller::TestController,
-    user::{context::Context, EventsUserInfo, UserController, UserStatsCollection, UserStatus},
+    spawn_coordinator::SpawnCoordinator,
+    user::{UserStatsCollection, UserStatus},
 };
 
 type SpawnUsersHandlesVector = Vec<JoinHandle<Vec<(JoinHandle<()>, u64)>>>;
@@ -65,6 +63,9 @@ impl Test {
             start_timestamp_arc_rwlock: Arc::new(RwLock::new(Instant::now())),
             prometheus_exporter_arc: Arc::new(PrometheusExporter::new()),
         }
+    }
+    pub fn clone_token(&self) -> Arc<CancellationToken> {
+        self.token.clone()
     }
 
     pub fn create_test_controller(&self) -> TestController {
@@ -111,145 +112,6 @@ impl Test {
         }
         let sleep_time = rand::thread_rng().gen_range(between.0..=between.1);
         tokio::time::sleep(Duration::from_secs(sleep_time)).await;
-    }
-
-    // TODO: this method spawns users with a spawn rate, that depends on the user type and not the global spawn rate for all given users
-    pub fn spawn_users<T, S>(
-        &self,
-        count: u64,
-        starting_index: u64,
-        results_tx: mpsc::Sender<MainMessage>,
-        test_controller: Arc<TestController>,
-        shared: S,
-    ) -> JoinHandle<Vec<(JoinHandle<()>, u64)>>
-    where
-        T: HasTask + User + User<Shared = S>,
-        S: Shared,
-    {
-        tracing::info!(
-            user_name = T::get_name(),
-            user_count = count,
-            %starting_index,
-            "Spawning users",
-        );
-        let tasks = Arc::new(T::get_async_tasks());
-        if tasks.is_empty() {
-            // TODO: total users spawned will always be logged since it will never reach total spawnbale users
-            tracing::warn!(
-                user_name = T::get_name(),
-                "User has no tasks. Will not be spawned"
-            );
-            return tokio::spawn(async move { vec![] }); // just to avoid an infinite loop
-        }
-        let between = T::get_between();
-
-        let token = self.token.clone();
-
-        let test_config = self.test_config.clone();
-        let users_per_sec = test_config.users_per_sec;
-        tokio::spawn(async move {
-            let mut supervisors = vec![];
-            let mut users_spawned = 0;
-            for i in 0..count {
-                let test_config = test_config.clone();
-                let id = i + starting_index;
-
-                // these are the tokens for the test
-                let test_token_for_user = token.clone();
-                let test_spawn_token = token.clone();
-
-                // create a user token for the UserController
-                let user_token = Arc::new(CancellationToken::new());
-                let user_controller = UserController::new(user_token.clone());
-                let user_info = EventsUserInfo::new(id, T::get_name());
-                let events_handler = EventsHandler::new(user_info, results_tx.clone());
-                let supervisor_events_handler = events_handler.clone();
-
-                // create the data for the user
-                let user_context = Context::new(
-                    test_controller.clone(),
-                    events_handler.clone(),
-                    user_controller,
-                );
-
-                let tasks = tasks.clone();
-                let shared = shared.clone();
-                let supervisor = tokio::spawn(async move {
-                    let handle = tokio::spawn(async move {
-                        events_handler.add_user_spawned().await;
-                        let mut user = T::new(&test_config, &user_context, shared).await;
-                        user.on_start(&user_context).await;
-
-                        loop {
-                            // get a random task
-                            if let Some(task) = tasks.get_prioritised_random() {
-                                // call it, do some sleep
-                                let task_call_and_sleep = async {
-                                    // this is the sleep time of a user
-                                    Test::sleep_between(between).await;
-
-                                    // this is the actual task
-                                    task.call(&mut user, &user_context).await;
-                                };
-
-                                tokio::select! {
-                                    _ = user_token.cancelled() => {
-                                        user.on_stop(&user_context).await;
-                                        return UserStatus::Cancelled;
-                                    }
-                                    _ = test_token_for_user.cancelled() => {
-                                        user.on_stop(&user_context).await;
-                                        return UserStatus::Finished;
-                                    }
-                                    _ = task_call_and_sleep => {
-                                        events_handler
-                                        .add_task_executed(EventsTaskInfo { name: task.name }).await;
-                                    }
-                                }
-                            }
-                        }
-                    });
-
-                    match handle.await {
-                        Ok(status) => match status {
-                            UserStatus::Finished => {
-                                supervisor_events_handler.add_user_finished().await;
-                            }
-                            UserStatus::Cancelled => {
-                                supervisor_events_handler.add_user_self_stopped().await;
-                            }
-                            _ => {
-                                // well obviously unreachable
-                            }
-                        },
-                        Err(e) => {
-                            if e.is_panic() {
-                                supervisor_events_handler
-                                    .add_user_panicked(e.to_string())
-                                    .await;
-                            } else {
-                                // very unlikely
-                                supervisor_events_handler.add_user_unknown_status().await;
-                            }
-                        } // at this point we can decide what to do with the user, maybe restart it?
-                    }
-                });
-
-                supervisors.push((supervisor, id));
-                users_spawned += 1;
-                if users_spawned % users_per_sec == 0 {
-                    tokio::select! {
-                        _ = test_spawn_token.cancelled() => {
-                            break;
-                        }
-                        _ = tokio::time::sleep(std::time::Duration::from_secs(1)) => {
-                            users_spawned = 0;
-                        }
-                    }
-                }
-            }
-            supervisors
-        })
     }
 
     fn start_timer(&self) -> JoinHandle<()> {
@@ -539,24 +401,31 @@ impl Test {
     pub async fn after_spawn_users(
         &mut self,
         results_rx: mpsc::Receiver<MainMessage>,
+        spawn_coordinator: SpawnCoordinator,
         spawn_users_handles_vec: SpawnUsersHandlesVector,
         total_spawnable_user_count: u64,
     ) {
-        // spin up a server
+        let spawn_coordinator_handle = spawn_coordinator.run();
         let server_handle = self.strat_server();
-
-        // start a timer in another task
         let timer_handle = self.start_timer();
 
         // start the background tasks in another task (calculating stats, printing stats, managing files)
         let background_tasks_handle = self.start_background_tasks(total_spawnable_user_count);
 
-        // start the reciever
         self.block_on_reciever(results_rx).await;
         tracing::debug!("Main reciever dropped");
 
         // this will cancel the timer and background tasks if the only given user has no tasks so it will finish immediately thus causing the reciever to drop
         self.token.cancel();
+
+        match spawn_coordinator_handle.await {
+            Ok(_) => {
+                tracing::debug!("Spawn coordinator joined");
+            }
+            Err(error) => {
+                tracing::error!(%error, "Error joining spawn coordinator");
+            }
+        }
 
         // wait for all users to finish
         for spawn_users_handles in spawn_users_handles_vec {

@@ -1,9 +1,5 @@
 use async_trait::async_trait;
-use rocust::rocust_lib::{
-    test::spawn_coordinator::{SpawnCoordinator, UserSpawnController},
-    traits::HasTask,
-    Context, TestConfig, User,
-};
+use rocust::rocust_lib::{traits::HasTask, Context, TestConfig, User};
 
 #[allow(dead_code)]
 
@@ -17,7 +13,7 @@ impl MyUser {
         context.stop().await;
     }
 
-    fn blocking(mut self, context: Context) -> (Self, Context) {
+    fn _blocking(mut self, context: Context) -> (Self, Context) {
         self.id = self.id + 1;
         let body = reqwest::blocking::get("https://www.rust-lang.org")
             .unwrap()
@@ -87,35 +83,4 @@ async fn main() {
     // blocking_tasks.push(rocust::rocust_lib::tasks::BlockingTask::new(
     //     1, "blocking", blocking,
     // ));
-
-    if std::env::var_os("RUST_LOG").is_none() {
-        std::env::set_var("RUST_LOG", "rocust=trace");
-    }
-    tracing_subscriber::fmt::init();
-
-    let f_controller = UserSpawnController {
-        user_name: String::from("FacebookUser"),
-        count: 33,
-        total_spawned: 0,
-    };
-
-    let g_controller = UserSpawnController {
-        user_name: String::from("GoogleUser"),
-        count: 20,
-        total_spawned: 0,
-    };
-
-    let k_controller = UserSpawnController {
-        user_name: String::from("KontentUser"),
-        count: 10,
-        total_spawned: 0,
-    };
-
-    let controllers = vec![f_controller, g_controller, k_controller];
-    let mut coordinator = SpawnCoordinator {
-        users_per_sec: 50,
-        user_spawn_controllers: controllers,
-    };
-
-    coordinator.spawn().await;
 }

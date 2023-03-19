@@ -81,10 +81,10 @@ impl GoogleUser {
             .delayed(std::time::Duration::from_secs(1))
             .await;
 
-        println!(
-            "GoogleUser fetched [https://{}] with delay of 1 second",
-            self.host
-        );
+        // println!(
+        //     "GoogleUser fetched [https://{}] with delay of 1 second",
+        //     self.host
+        // );
 
         match res {
             Ok(res) => {
@@ -193,17 +193,19 @@ struct FacebookUser {
 impl FacebookUser {
     #[task(priority = 10)]
     pub async fn index(&mut self, context: &Context) {
-        let ((res, elapsed), polls) = self
+        let ((res, elapsed), _polls) = self
             .client
             .get(String::from("https://facebook.com"))
             .send()
             .timed()
             .counted()
             .await;
-        println!(
-            "FacebookUser performed {} polls to fetch [https://facebook.com]",
-            polls
-        );
+
+        // println!(
+        //     "FacebookUser performed {} polls to fetch [https://facebook.com]",
+        //     polls
+        // );
+
         match res {
             Ok(res) => {
                 if res.status().is_success() {
@@ -256,13 +258,13 @@ impl User for FacebookUser {
 #[tokio::main]
 async fn main() {
     if std::env::var_os("RUST_LOG").is_none() {
-        std::env::set_var("RUST_LOG", "rocust=trace");
+        std::env::set_var("RUST_LOG", "rocust=debug");
     }
     tracing_subscriber::fmt::init();
 
     let test_config = TestConfig::default()
-        .user_count(10)
-        .users_per_sec(2)
+        .user_count(19)
+        .users_per_sec(1)
         .runtime(6000)
         .update_interval_in_secs(2)
         .print_to_stdout(true)

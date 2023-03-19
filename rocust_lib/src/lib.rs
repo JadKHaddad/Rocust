@@ -38,28 +38,75 @@ macro_rules! run {
             // depending on the weights, some users may not be spawned
             let total_spawnable_user_count = counts.iter().map(|(_, count)| count).sum::<u64>();
 
+            let mut user_spawn_controllers = Vec::new();
             let mut spawn_users_handles_vec = Vec::new();
 
             // how much to spawn and index interval as parameters
             let mut start_index = 0;
             let spawn_count = counts.get(&stringify!(<$user_type>)).expect("Unreachable Macro error!").clone();
-            let spawn_users_handles = $test.spawn_users::<$user_type, <$user_type as rocust::rocust_lib::traits::User>::Shared>(spawn_count, start_index, results_tx.clone(), test_controller.clone(), shared.clone());
-            spawn_users_handles_vec.push(spawn_users_handles);
+            // create a spawnController
+            // create an unbounded channel for the SpawnCoordinator and the Spawners
+            let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<u64>();
+            user_spawn_controllers.push(rocust::rocust_lib::test::spawn_coordinator::UserSpawnController::new(
+                <$user_type as rocust::rocust_lib::traits::HasTask>::get_name(),
+                spawn_count,
+                tx
+            ));
+            //create the spawner
+            let spawner: rocust::rocust_lib::test::spawn_coordinator::Spawner::<$user_type, <$user_type as rocust::rocust_lib::traits::User>::Shared>
+            = rocust::rocust_lib::test::spawn_coordinator::Spawner::new(
+                spawn_count,
+                $test.clone_token(),
+                $test.get_config().clone(),
+                test_controller.clone(),
+                results_tx.clone(),
+                start_index,
+                shared.clone(),
+                rx
+            );
+            spawn_users_handles_vec.push(
+                spawner.run()
+            );
             start_index += spawn_count;
 
             $(
                 let spawn_count = counts.get(&stringify!(<$user_types>)).expect("Unreachable Macro error!").clone();
-                let spawn_users_handles = $test.spawn_users::<$user_types, <$user_types as rocust::rocust_lib::traits::User>::Shared>(spawn_count, start_index, results_tx.clone(), test_controller.clone(), shared.clone());
-                spawn_users_handles_vec.push(spawn_users_handles);
+                let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<u64>();
+                user_spawn_controllers.push(rocust::rocust_lib::test::spawn_coordinator::UserSpawnController::new(
+                    <$user_types as rocust::rocust_lib::traits::HasTask>::get_name(),
+                    spawn_count,
+                    tx
+                ));
+                let spawner: rocust::rocust_lib::test::spawn_coordinator::Spawner::<$user_types, <$user_types as rocust::rocust_lib::traits::User>::Shared>
+                = rocust::rocust_lib::test::spawn_coordinator::Spawner::new(
+                    spawn_count,
+                    $test.clone_token(),
+                    $test.get_config().clone(),
+                    test_controller.clone(),
+                    results_tx.clone(),
+                    start_index,
+                    shared.clone(),
+                    rx
+                );
+                spawn_users_handles_vec.push(
+                    spawner.run()
+                );
                 start_index += spawn_count;
             )*
+
+            // now we can start the spawn coordinator
+            let spawn_coordinator = rocust::rocust_lib::test::spawn_coordinator::SpawnCoordinator::new(
+                $test.get_config().users_per_sec,
+                user_spawn_controllers,
+                $test.clone_token()
+            );
 
             // drop because why not >:D
             drop(test_controller);
 
             // drop the events_handler to drop the sender
             drop(results_tx);
-            $test.after_spawn_users(results_rx, spawn_users_handles_vec, total_spawnable_user_count).await;
+            $test.after_spawn_users(results_rx, spawn_coordinator, spawn_users_handles_vec, total_spawnable_user_count).await;
         }
     };
 }
