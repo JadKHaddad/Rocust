@@ -263,11 +263,11 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     let test_config = TestConfig::default()
-        .user_count(19)
-        .users_per_sec(1)
+        .user_count(95)
+        .users_per_sec(5)
         .runtime(6000)
         .update_interval_in_secs(2)
-        .print_to_stdout(true)
+        .print_to_stdout(false)
         .current_results_file(String::from("results/current_results.csv"))
         .results_history_file(String::from("results/results_history.csv"))
         .summary_file(String::from("results/summary.json"))

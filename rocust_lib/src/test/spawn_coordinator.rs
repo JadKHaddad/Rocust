@@ -90,10 +90,9 @@ impl SpawnCoordinator {
 
         // now we could have some remaining users to spawn, so lets spawn them
         if remaining_users_to_spawn > 0 {
-            // tracing::debug!("{} remaining users to spawn", remaining_users_to_spawn);
             let global_users_to_spawn_count_per_user =
                 remaining_users_to_spawn as f64 / self.user_spawn_controllers.len() as f64;
-            self.inner_spawn(global_users_to_spawn_count_per_user.floor());
+            self.inner_spawn(global_users_to_spawn_count_per_user);
         }
     }
 
@@ -109,10 +108,10 @@ impl SpawnCoordinator {
             let mut users_to_spawn =
                 self.users_per_sec as f64 / self.user_spawn_controllers.len() as f64;
 
-            // adjust the wait time if we have to spawn a number of users that is not an integer
-            if users_to_spawn.fract() != 0.0 {
+            // FIXME adjust the wait time if we have a number of users to spawn that is less than not a whole number
+            if users_to_spawn.fract() > 0.0 {
                 wait_time_in_millis = (1000.0 / users_to_spawn.fract()) as u64;
-                users_to_spawn = users_to_spawn.ceil();
+                users_to_spawn = users_to_spawn.floor();
             }
 
             tracing::debug!(
@@ -205,11 +204,12 @@ where
 
         tokio::spawn(async move {
             let mut supervisors = vec![];
-
+            let mut current_index = self.starting_index;
             while let Some(spawn_count) = self.spawn_coordinator_rx.recv().await {
-                for i in 0..spawn_count {
+                for _ in 0..spawn_count {
+                    let id = current_index;
+
                     let test_config = test_config.clone();
-                    let id = i + self.starting_index;
 
                     // these are the tokens for the test
                     let test_token_for_user = token.clone();
@@ -293,6 +293,7 @@ where
                         }
                     });
                     supervisors.push((supervisor, id));
+                    current_index += 1;
                 }
             }
             supervisors
