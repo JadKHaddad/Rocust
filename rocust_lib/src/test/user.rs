@@ -7,7 +7,7 @@ use crate::{
 use serde::Serialize;
 use serde_json::Error as SerdeJsonError;
 use serde_yaml::Error as SerdeYamlError;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, time::Duration};
 use thiserror::Error as ThisError;
 use tokio_util::sync::CancellationToken;
 
@@ -198,11 +198,11 @@ impl EventsUserInfo {
 }
 
 pub struct UserController {
-    token: Arc<CancellationToken>,
+    token: CancellationToken,
 }
 
 impl UserController {
-    pub fn new(token: Arc<CancellationToken>) -> Self {
+    pub fn new(token: CancellationToken) -> Self {
         Self { token }
     }
 

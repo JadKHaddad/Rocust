@@ -39,14 +39,14 @@ impl UserSpawnController {
 pub struct SpawnCoordinator {
     users_per_sec: u64,
     user_spawn_controllers: Vec<UserSpawnController>,
-    token: Arc<CancellationToken>,
+    token: CancellationToken,
 }
 
 impl SpawnCoordinator {
     pub fn new(
         users_per_sec: u64,
         user_spawn_controllers: Vec<UserSpawnController>,
-        token: Arc<CancellationToken>,
+        token: CancellationToken,
     ) -> Self {
         Self {
             users_per_sec,
@@ -150,7 +150,7 @@ where
     tasks: Arc<Vec<AsyncTask<T>>>,
     between: (u64, u64),
     user_count: u64,
-    token: Arc<CancellationToken>,
+    token: CancellationToken,
     test_config: TestConfig,
     test_controller: Arc<TestController>,
     results_tx: mpsc::Sender<MainMessage>,
@@ -166,7 +166,7 @@ where
 {
     pub fn new(
         user_count: u64,
-        token: Arc<CancellationToken>,
+        token: CancellationToken,
         test_config: TestConfig,
         test_controller: Arc<TestController>,
         results_tx: mpsc::Sender<MainMessage>,
@@ -215,7 +215,7 @@ where
                     let test_token_for_user = token.clone();
 
                     // create a user token for the UserController
-                    let user_token = Arc::new(CancellationToken::new());
+                    let user_token = CancellationToken::new();
                     let user_controller = UserController::new(user_token.clone());
                     let user_info = EventsUserInfo::new(id, self.user_name);
                     let events_handler = EventsHandler::new(user_info, results_tx.clone());

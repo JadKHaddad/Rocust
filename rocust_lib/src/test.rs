@@ -32,7 +32,7 @@ use self::{
 type SpawnUsersHandlesVector = Vec<JoinHandle<Vec<(JoinHandle<()>, u64)>>>;
 pub struct Test {
     test_config: TestConfig,
-    token: Arc<CancellationToken>,
+    token: CancellationToken,
     writers: Writers,
     total_users_spawned_arc_rwlock: Arc<RwLock<u64>>,
     all_results_arc_rwlock: Arc<RwLock<AllResults>>,
@@ -55,7 +55,7 @@ impl Test {
         let writers = Writers::new(&test_config).await;
         Self {
             test_config,
-            token: Arc::new(CancellationToken::new()),
+            token: CancellationToken::new(),
             writers,
             total_users_spawned_arc_rwlock: Arc::new(RwLock::new(0)),
             all_results_arc_rwlock: Arc::new(RwLock::new(AllResults::default())),
@@ -64,7 +64,7 @@ impl Test {
             prometheus_exporter_arc: Arc::new(PrometheusExporter::new()),
         }
     }
-    pub fn clone_token(&self) -> Arc<CancellationToken> {
+    pub fn clone_token(&self) -> CancellationToken {
         self.token.clone()
     }
 

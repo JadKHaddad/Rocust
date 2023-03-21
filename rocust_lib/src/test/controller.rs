@@ -1,13 +1,12 @@
-use std::sync::Arc;
 use tokio_util::sync::CancellationToken;
 
 #[derive(Clone)]
 pub struct TestController {
-    token: Arc<CancellationToken>,
+    token: CancellationToken,
 }
 
 impl TestController {
-    pub fn new(token: Arc<CancellationToken>) -> Self {
+    pub fn new(token: CancellationToken) -> Self {
         TestController { token }
     }
 
