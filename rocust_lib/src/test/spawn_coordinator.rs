@@ -17,16 +17,16 @@ use tokio_util::sync::CancellationToken;
 
 pub struct UserSpawnController {
     user_name: &'static str,
-    count: u64,
+    limit: u64,
     total_spawned: u64,
     spawn_tx: UnboundedSender<u64>,
 }
 
 impl UserSpawnController {
-    pub fn new(user_name: &'static str, count: u64, spawn_tx: UnboundedSender<u64>) -> Self {
+    pub fn new(user_name: &'static str, limit: u64, spawn_tx: UnboundedSender<u64>) -> Self {
         Self {
             user_name,
-            count,
+            limit,
             total_spawned: 0,
             spawn_tx,
         }
@@ -35,9 +35,9 @@ impl UserSpawnController {
     fn spawn_count(&mut self, count: u64) {
         let mut to_spawn_count = count;
 
-        if self.total_spawned + count >= self.count {
-            to_spawn_count = self.count - self.total_spawned;
-            self.total_spawned = self.count;
+        if self.total_spawned + count >= self.limit {
+            to_spawn_count = self.limit - self.total_spawned;
+            self.total_spawned = self.limit;
         } else {
             self.total_spawned += count;
         }
@@ -48,13 +48,13 @@ impl UserSpawnController {
             count = to_spawn_count,
             user_name = self.user_name,
             total_users_spawned = self.total_spawned,
-            total_spawnable_users = self.count,
+            total_spawnable_users = self.limit,
             "Spawning users"
         );
     }
 
     fn is_complete(&self) -> bool {
-        self.total_spawned >= self.count
+        self.total_spawned >= self.limit
     }
 }
 
