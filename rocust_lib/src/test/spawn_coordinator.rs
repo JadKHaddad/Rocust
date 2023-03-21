@@ -5,6 +5,7 @@ use crate::{
     tasks::{AsyncTask, EventsTaskInfo},
     test::user::{EventsUserInfo, UserController, UserStatus},
     traits::{HasTask, PrioritisedRandom},
+    utils::shift_vec,
     Context, Shared, Test, TestConfig, User,
 };
 use std::sync::Arc;
@@ -31,8 +32,29 @@ impl UserSpawnController {
         }
     }
 
-    fn send_spawn_count(&mut self, count: u64) {
-        let _ = self.spawn_tx.send(count);
+    fn spawn_count(&mut self, count: u64) {
+        let mut to_spawn_count = count;
+
+        if self.total_spawned + count >= self.count {
+            to_spawn_count = self.count - self.total_spawned;
+            self.total_spawned = self.count;
+        } else {
+            self.total_spawned += count;
+        }
+
+        let _ = self.spawn_tx.send(to_spawn_count);
+
+        tracing::debug!(
+            count = to_spawn_count,
+            user_name = self.user_name,
+            total_users_spawned = self.total_spawned,
+            total_spawnable_users = self.count,
+            "Spawning users"
+        );
+    }
+
+    fn is_complete(&self) -> bool {
+        self.total_spawned >= self.count
     }
 }
 
@@ -55,74 +77,44 @@ impl SpawnCoordinator {
         }
     }
 
-    fn inner_spawn(&mut self, global_users_to_spawn_per_user: f64) {
-        // now we check if all the users can be spawned in the gevin time and if not we save the remainning users to spawn
-        let mut remaining_users_to_spawn = 0;
-
-        self.user_spawn_controllers
-            .retain_mut(|user_spawn_controller| {
-                let mut users_to_spawn_count_per_user = global_users_to_spawn_per_user;
-                let mut retain = true;
-                if user_spawn_controller.total_spawned + global_users_to_spawn_per_user as u64
-                    >= user_spawn_controller.count
-                {
-                    users_to_spawn_count_per_user =
-                        (user_spawn_controller.count - user_spawn_controller.total_spawned) as f64;
-                    remaining_users_to_spawn += user_spawn_controller.total_spawned
-                        + global_users_to_spawn_per_user as u64
-                        - user_spawn_controller.count;
-                    // so now this guy has spawned all the users, lets remove him from the list
-                    retain = false;
-                }
-                user_spawn_controller.send_spawn_count(users_to_spawn_count_per_user as u64);
-                user_spawn_controller.total_spawned += users_to_spawn_count_per_user as u64;
-
-                tracing::debug!(
-                    count = users_to_spawn_count_per_user as u64,
-                    user_name = user_spawn_controller.user_name,
-                    total_users_spawned = user_spawn_controller.total_spawned,
-                    total_spawnable_users = user_spawn_controller.count,
-                    "Spawning users"
-                );
-
-                retain
-            });
-
-        // now we could have some remaining users to spawn, so lets spawn them
-        if remaining_users_to_spawn > 0 {
-            let global_users_to_spawn_count_per_user =
-                remaining_users_to_spawn as f64 / self.user_spawn_controllers.len() as f64;
-            self.inner_spawn(global_users_to_spawn_count_per_user);
-        }
-    }
-
     async fn spawn(&mut self) {
+        let len = self.user_spawn_controllers.len() as u64;
         loop {
             if self.user_spawn_controllers.is_empty() {
                 break;
             }
 
-            let mut wait_time_in_millis = 1000;
-
-            // decide how many users per user type should be spawned depending on the number of pending users
-            let mut users_to_spawn =
-                self.users_per_sec as f64 / self.user_spawn_controllers.len() as f64;
-
-            // FIXME adjust the wait time if we have a number of users to spawn that is less than not a whole number
-            if users_to_spawn.fract() > 0.0 {
-                wait_time_in_millis = (1000.0 / users_to_spawn.fract()) as u64;
-                users_to_spawn = users_to_spawn.floor();
+            if self.users_per_sec < len {
+                let count = 1;
+                for i in 0..self.users_per_sec {
+                    self.user_spawn_controllers[i as usize].spawn_count(count);
+                }
+                shift_vec(&mut self.user_spawn_controllers);
+            } else if self.users_per_sec == len {
+                let count = 1;
+                for user_spawn_controller in &mut self.user_spawn_controllers {
+                    user_spawn_controller.spawn_count(count);
+                }
+            } else if self.users_per_sec % len == 0 {
+                let count = self.users_per_sec / len;
+                for user_spawn_controller in &mut self.user_spawn_controllers {
+                    user_spawn_controller.spawn_count(count);
+                }
+            } else {
+                let count = self.users_per_sec / len;
+                for i in 0..self.users_per_sec % len {
+                    self.user_spawn_controllers[i as usize].spawn_count(count + 1);
+                }
+                for i in self.users_per_sec % len..len {
+                    self.user_spawn_controllers[i as usize].spawn_count(count);
+                }
+                shift_vec(&mut self.user_spawn_controllers);
             }
 
-            tracing::debug!(
-                %users_to_spawn,
-                %wait_time_in_millis,
-                "Spawning users"
-            );
+            self.user_spawn_controllers
+                .retain(|user_spawn_controller| !user_spawn_controller.is_complete());
 
-            self.inner_spawn(users_to_spawn);
-
-            tokio::time::sleep(std::time::Duration::from_millis(wait_time_in_millis)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
     }
 

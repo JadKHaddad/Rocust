@@ -17,3 +17,9 @@ pub(crate) fn get_timestamp_as_millis_as_string() -> Result<String, SystemTimeEr
 pub(crate) fn get_extension_from_filename(filename: &Path) -> Option<&str> {
     filename.extension().and_then(OsStr::to_str)
 }
+
+pub(crate) fn shift_vec<T>(vec: &mut Vec<T>) {
+    if let Some(last) = vec.pop() {
+        vec.insert(0, last);
+    }
+}
