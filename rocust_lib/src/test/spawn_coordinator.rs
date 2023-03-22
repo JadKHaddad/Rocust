@@ -5,7 +5,6 @@ use crate::{
     tasks::{AsyncTask, EventsTaskInfo},
     test::user::{EventsUserInfo, UserController, UserStatus},
     traits::{HasTask, PrioritisedRandom},
-    utils::shift_vec,
     Context, Shared, Test, TestConfig, User,
 };
 use std::sync::Arc;
@@ -89,7 +88,7 @@ impl SpawnCoordinator {
                 for i in 0..self.users_per_sec {
                     self.user_spawn_controllers[i as usize].spawn_count(count);
                 }
-                shift_vec(&mut self.user_spawn_controllers);
+                self.user_spawn_controllers.rotate_right(1);
             } else if self.users_per_sec == len {
                 let count = 1;
                 for user_spawn_controller in &mut self.user_spawn_controllers {
@@ -108,7 +107,7 @@ impl SpawnCoordinator {
                 for i in self.users_per_sec % len..len {
                     self.user_spawn_controllers[i as usize].spawn_count(count);
                 }
-                shift_vec(&mut self.user_spawn_controllers);
+                self.user_spawn_controllers.rotate_right(1);
             }
 
             self.user_spawn_controllers
