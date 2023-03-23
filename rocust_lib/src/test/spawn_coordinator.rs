@@ -194,7 +194,7 @@ where
         let test_controller = self.test_controller.clone();
 
         tokio::spawn(async move {
-            let mut supervisors = vec![];
+            let mut supervisors = Vec::with_capacity(self.user_count as usize);
             let mut current_index = self.starting_index;
             while let Some(spawn_count) = self.spawn_coordinator_rx.recv().await {
                 for _ in 0..spawn_count {

@@ -30,7 +30,7 @@ struct GoogleUser {
 
 #[has_task(min_sleep = 1, max_sleep = 2, weight = 1)]
 impl GoogleUser {
-    #[task(priority = 10)]
+    #[task(priority = 5)]
     pub async fn blocking_index(&mut self, context: &Context) {
         println!("GoogleUser [{}] performing blocking", self.id);
         let host = self.host;
@@ -71,7 +71,7 @@ impl GoogleUser {
         }
     }
 
-    #[task(priority = 10)]
+    #[task(priority = 40)]
     pub async fn index(&mut self, context: &Context) {
         let (res, elapsed) = self
             .client
@@ -111,7 +111,7 @@ impl GoogleUser {
         }
     }
 
-    #[task(priority = 10)]
+    #[task(priority = 40)]
     pub async fn none_existing_path(&mut self, context: &Context) {
         let (res, elapsed) = self
             .client
@@ -191,7 +191,7 @@ struct FacebookUser {
 
 #[has_task(min_sleep = 1, max_sleep = 2, weight = 1)]
 impl FacebookUser {
-    #[task(priority = 10)]
+    #[task(priority = 40)]
     pub async fn index(&mut self, context: &Context) {
         let ((res, elapsed), _polls) = self
             .client
@@ -258,13 +258,13 @@ impl User for FacebookUser {
 #[tokio::main]
 async fn main() {
     if std::env::var_os("RUST_LOG").is_none() {
-        std::env::set_var("RUST_LOG", "rocust=debug");
+        std::env::set_var("RUST_LOG", "rocust=info");
     }
     tracing_subscriber::fmt::init();
 
     let test_config = TestConfig::default()
-        .user_count(95)
-        .users_per_sec(3)
+        .user_count(1000)
+        .users_per_sec(20)
         .runtime(6000)
         .update_interval_in_secs(2)
         .print_to_stdout(false)
