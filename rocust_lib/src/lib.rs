@@ -46,7 +46,7 @@ macro_rules! run {
             let spawn_count = counts.get(&stringify!(<$user_type>)).expect("Unreachable Macro error!").clone();
             // create a spawnController
             // create an unbounded channel for the SpawnCoordinator and the Spawners
-            let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<u64>();
+            let (tx, rx) = tokio::sync::mpsc::channel(100);
             user_spawn_controllers.push(rocust::rocust_lib::test::spawn_coordinator::UserSpawnController::new(
                 <$user_type as rocust::rocust_lib::traits::HasTask>::get_name(),
                 spawn_count,
@@ -71,7 +71,7 @@ macro_rules! run {
 
             $(
                 let spawn_count = counts.get(&stringify!(<$user_types>)).expect("Unreachable Macro error!").clone();
-                let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<u64>();
+                let (tx, rx) = tokio::sync::mpsc::channel(100);
                 user_spawn_controllers.push(rocust::rocust_lib::test::spawn_coordinator::UserSpawnController::new(
                     <$user_types as rocust::rocust_lib::traits::HasTask>::get_name(),
                     spawn_count,

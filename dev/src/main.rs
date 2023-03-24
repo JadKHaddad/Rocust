@@ -30,22 +30,23 @@ struct GoogleUser {
 
 #[has_task(min_sleep = 1, max_sleep = 2, weight = 1)]
 impl GoogleUser {
-    #[task(priority = 5)]
+    // #[task(priority = 5)]
+    #[allow(dead_code)]
     pub async fn blocking_index(&mut self, context: &Context) {
         println!("GoogleUser [{}] performing blocking", self.id);
         let host = self.host;
 
         //spawn blocking, recommended
-        // let res = tokio::task::spawn_blocking(move || {
-        //     reqwest::blocking::get(format!("https://{}", host))
-        // })
-        // .await
-        // .unwrap();
+        let res = tokio::task::spawn_blocking(move || {
+            reqwest::blocking::get(format!("https://{}", host))
+        })
+        .await
+        .unwrap();
 
         //or block in place
-        let res = tokio::task::block_in_place(move || {
-            reqwest::blocking::get(format!("https://{}", host))
-        });
+        // let res = tokio::task::block_in_place(move || {
+        //     reqwest::blocking::get(format!("https://{}", host))
+        // });
 
         match res {
             Ok(res) => {
@@ -152,12 +153,14 @@ impl GoogleUser {
         }
     }
 
-    #[task(priority = 1)]
+    // #[task(priority = 1)]
+    #[allow(dead_code)]
     async fn will_panic(&mut self, _context: &Context) {
         panic!("This task will panic");
     }
 
-    #[task(priority = 1)]
+    // #[task(priority = 1)]
+    #[allow(dead_code)]
     async fn suicide(&mut self, context: &Context) {
         context.stop().await;
     }
@@ -231,7 +234,8 @@ impl FacebookUser {
         }
     }
 
-    #[task(priority = 1)]
+    // #[task(priority = 1)]
+    #[allow(dead_code)]
     async fn suicide(&mut self, context: &Context) {
         context.stop().await;
         unreachable!();
@@ -263,11 +267,11 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     let test_config = TestConfig::default()
-        .user_count(1000)
-        .users_per_sec(20)
+        .user_count(50)
+        .users_per_sec(3)
         .runtime(6000)
         .update_interval_in_secs(2)
-        .print_to_stdout(false)
+        .print_to_stdout(true)
         .current_results_file(String::from("results/current_results.csv"))
         .results_history_file(String::from("results/results_history.csv"))
         .summary_file(String::from("results/summary.json"))

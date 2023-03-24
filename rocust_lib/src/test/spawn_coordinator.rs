@@ -9,7 +9,7 @@ use crate::{
 };
 use std::sync::Arc;
 use tokio::{
-    sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
+    sync::mpsc::{self, Receiver, Sender},
     task::JoinHandle,
 };
 use tokio_util::sync::CancellationToken;
@@ -18,11 +18,12 @@ pub struct UserSpawnController {
     user_name: &'static str,
     limit: u64,
     total_spawned: u64,
-    spawn_tx: UnboundedSender<u64>,
+    spawn_tx: Sender<u64>,
 }
 
 impl UserSpawnController {
-    pub fn new(user_name: &'static str, limit: u64, spawn_tx: UnboundedSender<u64>) -> Self {
+    #[must_use]
+    pub fn new(user_name: &'static str, limit: u64, spawn_tx: Sender<u64>) -> Self {
         Self {
             user_name,
             limit,
@@ -31,7 +32,7 @@ impl UserSpawnController {
         }
     }
 
-    fn spawn_count(&mut self, count: u64) {
+    async fn spawn_count(&mut self, count: u64) {
         let mut to_spawn_count = count;
 
         if self.total_spawned + count >= self.limit {
@@ -41,7 +42,7 @@ impl UserSpawnController {
             self.total_spawned += count;
         }
 
-        let _ = self.spawn_tx.send(to_spawn_count);
+        let _ = self.spawn_tx.send(to_spawn_count).await;
 
         tracing::debug!(
             count = to_spawn_count,
@@ -86,26 +87,32 @@ impl SpawnCoordinator {
             if self.users_per_sec < len {
                 let count = 1;
                 for i in 0..self.users_per_sec {
-                    self.user_spawn_controllers[i as usize].spawn_count(count);
+                    self.user_spawn_controllers[i as usize]
+                        .spawn_count(count)
+                        .await;
                 }
                 self.user_spawn_controllers.rotate_right(1);
             } else if self.users_per_sec == len {
                 let count = 1;
                 for user_spawn_controller in &mut self.user_spawn_controllers {
-                    user_spawn_controller.spawn_count(count);
+                    user_spawn_controller.spawn_count(count).await;
                 }
             } else if self.users_per_sec % len == 0 {
                 let count = self.users_per_sec / len;
                 for user_spawn_controller in &mut self.user_spawn_controllers {
-                    user_spawn_controller.spawn_count(count);
+                    user_spawn_controller.spawn_count(count).await;
                 }
             } else {
                 let count = self.users_per_sec / len;
                 for i in 0..self.users_per_sec % len {
-                    self.user_spawn_controllers[i as usize].spawn_count(count + 1);
+                    self.user_spawn_controllers[i as usize]
+                        .spawn_count(count + 1)
+                        .await;
                 }
                 for i in self.users_per_sec % len..len {
-                    self.user_spawn_controllers[i as usize].spawn_count(count);
+                    self.user_spawn_controllers[i as usize]
+                        .spawn_count(count)
+                        .await;
                 }
                 self.user_spawn_controllers.rotate_right(1);
             }
@@ -147,7 +154,7 @@ where
     results_tx: mpsc::Sender<MainMessage>,
     starting_index: u64,
     shared: S,
-    spawn_coordinator_rx: UnboundedReceiver<u64>,
+    spawn_coordinator_rx: Receiver<u64>,
 }
 
 impl<T, S> Spawner<T, S>
@@ -155,6 +162,7 @@ where
     T: HasTask + User + User<Shared = S>,
     S: Shared,
 {
+    #[must_use]
     pub fn new(
         user_count: u64,
         token: CancellationToken,
@@ -163,7 +171,7 @@ where
         results_tx: mpsc::Sender<MainMessage>,
         starting_index: u64,
         shared: S,
-        spawn_coordinator_rx: UnboundedReceiver<u64>,
+        spawn_coordinator_rx: Receiver<u64>,
     ) -> Self {
         Self {
             user_name: T::get_name(),
