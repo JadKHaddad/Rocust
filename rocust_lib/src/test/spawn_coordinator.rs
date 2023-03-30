@@ -201,6 +201,10 @@ where
         let results_tx = self.results_tx.clone();
         let test_controller = self.test_controller.clone();
 
+        if tasks.is_empty() {
+            tracing::warn!(user_name = self.user_name, "User has no tasks.");
+        }
+
         tokio::spawn(async move {
             let mut supervisors = Vec::with_capacity(self.user_count as usize);
             let mut current_index = self.starting_index;
@@ -236,8 +240,6 @@ where
                             user.on_start(&user_context).await;
 
                             if tasks.is_empty() {
-                                tracing::warn!(user_name = self.user_name, "User has no tasks.");
-
                                 user.on_stop(&user_context).await;
                                 return UserStatus::Finished;
                             }

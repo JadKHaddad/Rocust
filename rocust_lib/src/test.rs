@@ -74,10 +74,6 @@ impl Test {
         Instant::now().duration_since(*start_timestamp)
     }
 
-    fn update_stats_on_update_interval(elapsed_time: &Duration, all_results: &mut AllResults) {
-        all_results.calculate_on_update_interval(elapsed_time);
-    }
-
     async fn print_stats_to_stdout(
         precision: usize,
         print_to_stdout: bool,
@@ -197,7 +193,7 @@ impl Test {
 
                         let elapsed_time = Test::calculate_elapsed_time(&*start_timestamp_arc_rwlock.read().await);
 
-                        Test::update_stats_on_update_interval(&elapsed_time, &mut *all_results_gaurd);
+                        all_results_gaurd.calculate_on_update_interval(&elapsed_time);
 
                         Test::print_stats_to_stdout(test_config.precision, test_config.print_to_stdout, &*all_results_gaurd).await;
 
@@ -212,205 +208,274 @@ impl Test {
         while let Some(msg) = results_rx.recv().await {
             match msg {
                 MainMessage::ResultMessage(result_msg) => {
-                    let mut all_results_gaurd = self.all_results_arc_rwlock.write().await;
-
-                    match result_msg {
-                        ResultMessage::Success(sucess_result_msg) => {
-                            all_results_gaurd.add_success(
-                                &sucess_result_msg.endpoint_type_name,
-                                sucess_result_msg.response_time,
-                            );
-
-                            // updating user results
-                            self.user_stats_collection.add_success(
-                                &sucess_result_msg.user_info.id,
-                                &sucess_result_msg.endpoint_type_name,
-                                sucess_result_msg.response_time,
-                            );
-
-                            self.prometheus_exporter_arc.add_success(
-                                RequestLabel {
-                                    endpoint_type: sucess_result_msg.endpoint_type_name.r#type,
-                                    endpoint_name: sucess_result_msg.endpoint_type_name.name,
-                                    user_id: sucess_result_msg.user_info.id,
-                                    user_name: sucess_result_msg.user_info.name,
-                                },
-                                sucess_result_msg.response_time,
-                            );
-                        }
-                        ResultMessage::Failure(failure_result_msg) => {
-                            all_results_gaurd.add_failure(&failure_result_msg.endpoint_type_name);
-
-                            // updating user results
-                            self.user_stats_collection.add_failure(
-                                &failure_result_msg.user_info.id,
-                                &failure_result_msg.endpoint_type_name,
-                            );
-
-                            self.prometheus_exporter_arc.add_failure(RequestLabel {
-                                endpoint_type: failure_result_msg.endpoint_type_name.r#type,
-                                endpoint_name: failure_result_msg.endpoint_type_name.name,
-                                user_id: failure_result_msg.user_info.id,
-                                user_name: failure_result_msg.user_info.name,
-                            });
-                        }
-                        ResultMessage::Error(error_result_msg) => {
-                            all_results_gaurd.add_error(
-                                &error_result_msg.endpoint_type_name,
-                                &error_result_msg.error,
-                            );
-
-                            // updating user results
-                            self.user_stats_collection.add_error(
-                                &error_result_msg.user_info.id,
-                                &error_result_msg.endpoint_type_name,
-                                &error_result_msg.error,
-                            );
-
-                            self.prometheus_exporter_arc.add_error(RequestLabel {
-                                endpoint_type: error_result_msg.endpoint_type_name.r#type,
-                                endpoint_name: error_result_msg.endpoint_type_name.name,
-                                user_id: error_result_msg.user_info.id,
-                                user_name: error_result_msg.user_info.name,
-                            });
-                        }
-                    }
+                    self.on_result_message(result_msg).await;
                 }
 
                 MainMessage::UserSpawned(user_spawned_msg) => {
-                    tracing::trace!(
-                        user_name = &user_spawned_msg.user_info.name,
-                        user_id = &user_spawned_msg.user_info.id,
-                        "User spawned"
-                    );
-
-                    let mut total_users_spawned_gaurd =
-                        self.total_users_spawned_arc_rwlock.write().await;
-                    *total_users_spawned_gaurd += 1;
-
-                    self.user_stats_collection.insert_user(
-                        user_spawned_msg.user_info.id,
-                        user_spawned_msg.user_info.name,
-                    );
-
-                    self.prometheus_exporter_arc.add_user(UserCountLabel {
-                        user_name: user_spawned_msg.user_info.name,
-                    });
+                    self.on_user_spawned_message(user_spawned_msg).await;
                 }
 
                 // tasks with suicide or panic are not included
                 MainMessage::TaskExecuted(user_fired_task_msg) => {
-                    tracing::trace!(
-                        user_name = &user_fired_task_msg.user_info.name,
-                        user_id = &user_fired_task_msg.user_info.id,
-                        task_name = &user_fired_task_msg.task_info.name,
-                        "User excuted a task"
-                    );
-
-                    self.user_stats_collection
-                        .increment_total_tasks(&user_fired_task_msg.user_info.id);
-
-                    self.prometheus_exporter_arc.add_task(TaskLabel {
-                        user_id: user_fired_task_msg.user_info.id,
-                        user_name: user_fired_task_msg.user_info.name,
-                        task_name: user_fired_task_msg.task_info.name,
-                    });
+                    self.on_task_excuted_message(user_fired_task_msg);
                 }
 
                 MainMessage::UserSelfStopped(user_self_stopped_msg) => {
-                    tracing::info!(
-                        user_name = &user_self_stopped_msg.user_info.name,
-                        user_id = &user_self_stopped_msg.user_info.id,
-                        "User attempted suicide",
-                    );
-
-                    self.user_stats_collection.set_user_status(
-                        &user_self_stopped_msg.user_info.id,
-                        UserStatus::Cancelled,
-                    );
-
-                    self.prometheus_exporter_arc.remove_user(UserCountLabel {
-                        user_name: user_self_stopped_msg.user_info.name,
-                    });
-
-                    self.prometheus_exporter_arc.add_suicide(UserLabel {
-                        user_id: user_self_stopped_msg.user_info.id,
-                        user_name: user_self_stopped_msg.user_info.name,
-                    });
+                    self.on_user_self_stopped_message(user_self_stopped_msg);
                 }
 
                 MainMessage::UserFinished(user_finished_msg) => {
-                    self.user_stats_collection
-                        .set_user_status(&user_finished_msg.user_info.id, UserStatus::Finished);
+                    self.on_user_finished_message(user_finished_msg);
                 }
 
                 MainMessage::UserPanicked(user_panicked_msg) => {
-                    tracing::warn!(
-                        user_name = &user_panicked_msg.user_info.name,
-                        user_id = &user_panicked_msg.user_info.id,
-                        "User panicked!"
-                    );
-
-                    self.user_stats_collection
-                        .set_user_status(&user_panicked_msg.user_info.id, UserStatus::Panicked);
-
-                    self.prometheus_exporter_arc.remove_user(UserCountLabel {
-                        user_name: user_panicked_msg.user_info.name,
-                    });
-
-                    self.prometheus_exporter_arc.add_panic(UserLabel {
-                        user_id: user_panicked_msg.user_info.id,
-                        user_name: user_panicked_msg.user_info.name,
-                    });
+                    self.on_user_panicked_message(user_panicked_msg);
                 }
 
                 MainMessage::UserUnknownStatus(user_unknown_status_msg) => {
-                    tracing::warn!(
-                        user_name = &user_unknown_status_msg.user_info.name,
-                        user_id = &user_unknown_status_msg.user_info.id,
-                        "User has unknown status!. Supervisor failed to get user status",
-                    );
-
-                    self.user_stats_collection.set_user_status(
-                        &user_unknown_status_msg.user_info.id,
-                        UserStatus::Unknown,
-                    );
-
-                    self.prometheus_exporter_arc.remove_user(UserCountLabel {
-                        user_name: user_unknown_status_msg.user_info.name,
-                    });
+                    self.on_user_unknown_status_message(user_unknown_status_msg);
                 }
+            }
+        }
+        tracing::debug!("Main reciever dropped");
+    }
+
+    // will not be refactored because of borrow checker issues :->
+    async fn on_result_message(&mut self, result_msg: ResultMessage) {
+        let mut all_results_gaurd = self.all_results_arc_rwlock.write().await;
+
+        match result_msg {
+            ResultMessage::Success(sucess_result_msg) => {
+                all_results_gaurd.add_success(
+                    &sucess_result_msg.endpoint_type_name,
+                    sucess_result_msg.response_time,
+                );
+
+                self.user_stats_collection.add_success(
+                    &sucess_result_msg.user_info.id,
+                    &sucess_result_msg.endpoint_type_name,
+                    sucess_result_msg.response_time,
+                );
+
+                self.prometheus_exporter_arc.add_success(
+                    RequestLabel {
+                        endpoint_type: sucess_result_msg.endpoint_type_name.r#type,
+                        endpoint_name: sucess_result_msg.endpoint_type_name.name,
+                        user_id: sucess_result_msg.user_info.id,
+                        user_name: sucess_result_msg.user_info.name,
+                    },
+                    sucess_result_msg.response_time,
+                );
+            }
+            ResultMessage::Failure(failure_result_msg) => {
+                all_results_gaurd.add_failure(&failure_result_msg.endpoint_type_name);
+
+                self.user_stats_collection.add_failure(
+                    &failure_result_msg.user_info.id,
+                    &failure_result_msg.endpoint_type_name,
+                );
+
+                self.prometheus_exporter_arc.add_failure(RequestLabel {
+                    endpoint_type: failure_result_msg.endpoint_type_name.r#type,
+                    endpoint_name: failure_result_msg.endpoint_type_name.name,
+                    user_id: failure_result_msg.user_info.id,
+                    user_name: failure_result_msg.user_info.name,
+                });
+            }
+            ResultMessage::Error(error_result_msg) => {
+                all_results_gaurd.add_error(
+                    &error_result_msg.endpoint_type_name,
+                    &error_result_msg.error,
+                );
+
+                self.user_stats_collection.add_error(
+                    &error_result_msg.user_info.id,
+                    &error_result_msg.endpoint_type_name,
+                    &error_result_msg.error,
+                );
+
+                self.prometheus_exporter_arc.add_error(RequestLabel {
+                    endpoint_type: error_result_msg.endpoint_type_name.r#type,
+                    endpoint_name: error_result_msg.endpoint_type_name.name,
+                    user_id: error_result_msg.user_info.id,
+                    user_name: error_result_msg.user_info.name,
+                });
             }
         }
     }
 
-    pub async fn before_spawn_users(
-        &self,
-    ) -> (mpsc::Sender<MainMessage>, mpsc::Receiver<MainMessage>) {
-        *self.start_timestamp_arc_rwlock.write().await = Instant::now();
-        mpsc::channel(100)
+    #[inline]
+    async fn on_user_spawned_message(
+        &mut self,
+        user_spawned_msg: crate::messages::UserSpawnedMessage,
+    ) {
+        tracing::trace!(
+            user_name = &user_spawned_msg.user_info.name,
+            user_id = &user_spawned_msg.user_info.id,
+            "User spawned"
+        );
+
+        let mut total_users_spawned_gaurd = self.total_users_spawned_arc_rwlock.write().await;
+        *total_users_spawned_gaurd += 1;
+
+        self.user_stats_collection.insert_user(
+            user_spawned_msg.user_info.id,
+            user_spawned_msg.user_info.name,
+        );
+
+        self.prometheus_exporter_arc.add_user(UserCountLabel {
+            user_name: user_spawned_msg.user_info.name,
+        });
     }
 
-    pub async fn after_spawn_users(
+    #[inline]
+    fn on_user_self_stopped_message(
+        &mut self,
+        user_self_stopped_msg: crate::messages::UserSelfStoppedMessage,
+    ) {
+        tracing::info!(
+            user_name = &user_self_stopped_msg.user_info.name,
+            user_id = &user_self_stopped_msg.user_info.id,
+            "User attempted suicide",
+        );
+
+        self.user_stats_collection
+            .set_user_status(&user_self_stopped_msg.user_info.id, UserStatus::Cancelled);
+
+        self.prometheus_exporter_arc.remove_user(UserCountLabel {
+            user_name: user_self_stopped_msg.user_info.name,
+        });
+
+        self.prometheus_exporter_arc.add_suicide(UserLabel {
+            user_id: user_self_stopped_msg.user_info.id,
+            user_name: user_self_stopped_msg.user_info.name,
+        });
+    }
+
+    #[inline]
+    fn on_task_excuted_message(
+        &mut self,
+        user_fired_task_msg: crate::messages::TaskExecutedMessage,
+    ) {
+        tracing::trace!(
+            user_name = &user_fired_task_msg.user_info.name,
+            user_id = &user_fired_task_msg.user_info.id,
+            task_name = &user_fired_task_msg.task_info.name,
+            "User excuted a task"
+        );
+
+        self.user_stats_collection
+            .increment_total_tasks(&user_fired_task_msg.user_info.id);
+
+        self.prometheus_exporter_arc.add_task(TaskLabel {
+            user_id: user_fired_task_msg.user_info.id,
+            user_name: user_fired_task_msg.user_info.name,
+            task_name: user_fired_task_msg.task_info.name,
+        });
+    }
+
+    #[inline]
+    fn on_user_finished_message(
+        &mut self,
+        user_finished_msg: crate::messages::UserFinishedMessage,
+    ) {
+        self.user_stats_collection
+            .set_user_status(&user_finished_msg.user_info.id, UserStatus::Finished);
+    }
+
+    #[inline]
+    fn on_user_panicked_message(
+        &mut self,
+        user_panicked_msg: crate::messages::UserPanickedMessage,
+    ) {
+        tracing::warn!(
+            user_name = &user_panicked_msg.user_info.name,
+            user_id = &user_panicked_msg.user_info.id,
+            "User panicked!"
+        );
+
+        self.user_stats_collection
+            .set_user_status(&user_panicked_msg.user_info.id, UserStatus::Panicked);
+
+        self.prometheus_exporter_arc.remove_user(UserCountLabel {
+            user_name: user_panicked_msg.user_info.name,
+        });
+
+        self.prometheus_exporter_arc.add_panic(UserLabel {
+            user_id: user_panicked_msg.user_info.id,
+            user_name: user_panicked_msg.user_info.name,
+        });
+    }
+
+    #[inline]
+    fn on_user_unknown_status_message(
+        &mut self,
+        user_unknown_status_msg: crate::messages::UserUnknownStatusMessage,
+    ) {
+        tracing::warn!(
+            user_name = &user_unknown_status_msg.user_info.name,
+            user_id = &user_unknown_status_msg.user_info.id,
+            "User has unknown status!. Supervisor failed to get user status",
+        );
+
+        self.user_stats_collection
+            .set_user_status(&user_unknown_status_msg.user_info.id, UserStatus::Unknown);
+
+        self.prometheus_exporter_arc.remove_user(UserCountLabel {
+            user_name: user_unknown_status_msg.user_info.name,
+        });
+    }
+
+    pub async fn sink(
         &mut self,
         results_rx: mpsc::Receiver<MainMessage>,
         spawn_coordinator: SpawnCoordinator,
         spawn_users_handles_vec: SpawnUsersHandlesVector,
         total_spawnable_user_count: u64,
     ) {
+        *self.start_timestamp_arc_rwlock.write().await = Instant::now();
+
         let spawn_coordinator_handle = spawn_coordinator.run();
         let server_handle = self.strat_server();
         let timer_handle = self.start_timer();
-
-        // start the background tasks in another task (calculating stats, printing stats, managing files)
+        //(calculating stats, printing stats, managing files)
         let background_tasks_handle = self.start_background_tasks(total_spawnable_user_count);
 
         self.block_on_reciever(results_rx).await;
-        tracing::debug!("Main reciever dropped");
 
-        // this will cancel the timer and background tasks if the only given user has no tasks so it will finish immediately thus causing the reciever to drop
-        self.token.cancel();
+        self.join_tasks(
+            spawn_coordinator_handle,
+            spawn_users_handles_vec,
+            server_handle,
+            background_tasks_handle,
+            timer_handle,
+        )
+        .await;
 
+        let elapsed_time =
+            Test::calculate_elapsed_time(&*self.start_timestamp_arc_rwlock.read().await);
+
+        self.update_summary_and_write_to_file(&elapsed_time).await;
+
+        let mut all_results_gaurd = self.all_results_arc_rwlock.write().await;
+
+        all_results_gaurd.calculate_on_update_interval(&elapsed_time);
+
+        self.writers
+            .write_on_update_interval(&*all_results_gaurd, &*self.prometheus_exporter_arc)
+            .await;
+
+        tracing::info!("Test terminated");
+    }
+
+    async fn join_tasks(
+        &mut self,
+        spawn_coordinator_handle: JoinHandle<()>,
+        spawn_users_handles_vec: Vec<JoinHandle<Vec<(JoinHandle<()>, u64)>>>,
+        server_handle: JoinHandle<()>,
+        background_tasks_handle: JoinHandle<()>,
+        timer_handle: JoinHandle<()>,
+    ) {
         match spawn_coordinator_handle.await {
             Ok(_) => {
                 tracing::debug!("Spawn coordinator joined");
@@ -420,7 +485,6 @@ impl Test {
             }
         }
 
-        // wait for all users to finish
         for spawn_users_handles in spawn_users_handles_vec {
             match spawn_users_handles.await {
                 Ok(supervisors) => {
@@ -464,20 +528,6 @@ impl Test {
                 tracing::error!(%error, "Error joining timer");
             }
         }
-        let elapsed_time =
-            Test::calculate_elapsed_time(&*self.start_timestamp_arc_rwlock.read().await);
-
-        self.update_summary_and_write_to_file(&elapsed_time).await;
-
-        let mut all_results_gaurd = self.all_results_arc_rwlock.write().await;
-
-        Test::update_stats_on_update_interval(&elapsed_time, &mut *all_results_gaurd);
-
-        self.writers
-            .write_on_update_interval(&*all_results_gaurd, &*self.prometheus_exporter_arc)
-            .await;
-
-        tracing::info!("Test terminated");
     }
 
     fn get_summary_string_from_extension(

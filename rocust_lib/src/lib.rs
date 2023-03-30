@@ -17,19 +17,19 @@ pub use traits::{Shared, User};
 macro_rules! run {
     ($test:ident, $user_type:ty $(,$user_types:ty)*) => {
         async {
-            let (results_tx, results_rx) = $test.before_spawn_users().await;
+            let (results_tx, results_rx) = tokio::sync::mpsc::channel(100);
 
             // create the shared data for the Data struct for each user
             let test_controller = std::sync::Arc::new($test.create_test_controller());
 
             // get the shared data from the first user type
-            let shared = <$user_type as rocust::rocust_lib::traits::User>::Shared::new().await;
+            let shared = <$user_type as $crate::traits::User>::Shared::new().await;
 
             // decide the weight of each user type and spawn accordingly
             let mut weights = std::collections::HashMap::new();
-            weights.insert(stringify!(<$user_type>), <$user_type as rocust::rocust_lib::traits::HasTask>::get_weight());
+            weights.insert(stringify!(<$user_type>), <$user_type as $crate::traits::HasTask>::get_weight());
             $(
-                weights.insert(stringify!(<$user_types>), <$user_types as rocust::rocust_lib::traits::HasTask>::get_weight());
+                weights.insert(stringify!(<$user_types>), <$user_types as $crate::traits::HasTask>::get_weight());
             )*
             let total_given_users_count = weights.len();
             let full_weight = weights.iter().map(|(_, weight)| weight).sum::<u64>();
@@ -47,14 +47,14 @@ macro_rules! run {
             // create a spawnController
             // create an unbounded channel for the SpawnCoordinator and the Spawners
             let (tx, rx) = tokio::sync::mpsc::channel(100);
-            user_spawn_controllers.push(rocust::rocust_lib::test::spawn_coordinator::UserSpawnController::new(
-                <$user_type as rocust::rocust_lib::traits::HasTask>::get_name(),
+            user_spawn_controllers.push($crate::test::spawn_coordinator::UserSpawnController::new(
+                <$user_type as $crate::traits::HasTask>::get_name(),
                 spawn_count,
                 tx
             ));
             //create the spawner
-            let spawner: rocust::rocust_lib::test::spawn_coordinator::Spawner::<$user_type, <$user_type as rocust::rocust_lib::traits::User>::Shared>
-            = rocust::rocust_lib::test::spawn_coordinator::Spawner::new(
+            let spawner: $crate::test::spawn_coordinator::Spawner::<$user_type, <$user_type as $crate::traits::User>::Shared>
+            = $crate::test::spawn_coordinator::Spawner::new(
                 spawn_count,
                 $test.clone_token(),
                 $test.get_config().clone(),
@@ -72,13 +72,13 @@ macro_rules! run {
             $(
                 let spawn_count = counts.get(&stringify!(<$user_types>)).expect("Unreachable Macro error!").clone();
                 let (tx, rx) = tokio::sync::mpsc::channel(100);
-                user_spawn_controllers.push(rocust::rocust_lib::test::spawn_coordinator::UserSpawnController::new(
-                    <$user_types as rocust::rocust_lib::traits::HasTask>::get_name(),
+                user_spawn_controllers.push($crate::test::spawn_coordinator::UserSpawnController::new(
+                    <$user_types as $crate::traits::HasTask>::get_name(),
                     spawn_count,
                     tx
                 ));
-                let spawner: rocust::rocust_lib::test::spawn_coordinator::Spawner::<$user_types, <$user_types as rocust::rocust_lib::traits::User>::Shared>
-                = rocust::rocust_lib::test::spawn_coordinator::Spawner::new(
+                let spawner: $crate::test::spawn_coordinator::Spawner::<$user_types, <$user_types as $crate::traits::User>::Shared>
+                = $crate::test::spawn_coordinator::Spawner::new(
                     spawn_count,
                     $test.clone_token(),
                     $test.get_config().clone(),
@@ -95,7 +95,7 @@ macro_rules! run {
             )*
 
             // now we can start the spawn coordinator
-            let spawn_coordinator = rocust::rocust_lib::test::spawn_coordinator::SpawnCoordinator::new(
+            let spawn_coordinator = $crate::test::spawn_coordinator::SpawnCoordinator::new(
                 $test.get_config().users_per_sec,
                 user_spawn_controllers,
                 $test.clone_token()
@@ -106,7 +106,7 @@ macro_rules! run {
 
             // drop the events_handler to drop the sender
             drop(results_tx);
-            $test.after_spawn_users(results_rx, spawn_coordinator, spawn_users_handles_vec, total_spawnable_user_count).await;
+            $test.sink(results_rx, spawn_coordinator, spawn_users_handles_vec, total_spawnable_user_count).await;
         }
     };
 }
